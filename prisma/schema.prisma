@@ -11,9 +11,111 @@ datasource db {
   provider = "postgresql"
 }
 
-// نموذج اختبار وحيد لإثبات اتصال التطبيق ↔ Neon.
+// ── فحص السلامة (Bootstrap) — يبقى كما هو ───────────────────────────
 model HealthCheck {
   id        String   @id @default(cuid())
   label     String
   createdAt DateTime @default(now())
+}
+
+// ── الأدوار وأنواع البلوكات ──────────────────────────────────────────
+enum Role {
+  CREATOR
+  BRAND
+  ADMIN
+}
+
+// نظام بلوكات كامل البنية — الأنواع تُفعّل بموجات لاحقة (الآن الـenum فقط).
+enum BlockType {
+  LINK
+  FORM
+  GALLERY
+  EMBED
+  CONSULTATION
+  PAID_VIDEO
+  STORE
+  NEWSLETTER
+  QR
+}
+
+// ── المستخدم والمصادقة ───────────────────────────────────────────────
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  passwordHash  String
+  role          Role     @default(CREATOR)
+  emailVerified Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  creatorProfile          CreatorProfile?
+  emailVerificationTokens EmailVerificationToken[]
+  passwordResetTokens     PasswordResetToken[]
+}
+
+// التوكنات مُخزّنة مجزّأة (sha256) لا نصاً صريحاً · صلاحية قصيرة · استخدام مرّة واحدة.
+model EmailVerificationToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ── ملف المبدع + الصفحة + البلوكات ───────────────────────────────────
+model CreatorProfile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  username    String   @unique // مسار aktbot.link/username لاحقاً — slug مُتحقَّق
+  displayName String
+  bio         String?
+  avatarUrl   String?
+  language    String   @default("ar")
+  direction   String   @default("rtl")
+  isPublished Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  page Page?
+}
+
+model Page {
+  id               String   @id @default(cuid())
+  creatorProfileId String   @unique
+  theme            Json?
+  background       Json?
+  createdAt        DateTime @default(now())
+
+  creatorProfile CreatorProfile @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
+  blocks         Block[]
+}
+
+model Block {
+  id         String    @id @default(cuid())
+  pageId     String
+  type       BlockType
+  config     Json?
+  order      Int       @default(0)
+  visibility Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+
+  page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([pageId])
 }
