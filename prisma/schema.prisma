@@ -1,0 +1,19 @@
+// AktBot — Prisma schema (Neon Postgres, pooled)
+// القاعدة: additive فقط — لا حذف أعمدة/جداول/بيانات قائمة.
+// Prisma 7: لا يوضع url هنا — سلسلة الاتصال في prisma.config.ts، والاتصال عبر adapter.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// نموذج اختبار وحيد لإثبات اتصال التطبيق ↔ Neon.
+model HealthCheck {
+  id        String   @id @default(cuid())
+  label     String
+  createdAt DateTime @default(now())
+}
