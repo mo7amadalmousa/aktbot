@@ -89,6 +89,10 @@ model CreatorProfile {
   language    String   @default("ar")
   direction   String   @default("rtl")
   isPublished Boolean  @default(false)
+  // حقول العرض العامّ (additive) — رأس الصفحة العامّة.
+  isVerified    Boolean @default(false)
+  followerCount Int     @default(0)
+  socialLinks   Json? // { instagram, tiktok, youtube, x, website, ... } — تُنقّى عند الإدخال لاحقاً
   createdAt   DateTime @default(now())
 
   user User  @relation(fields: [userId], references: [id], onDelete: Cascade)

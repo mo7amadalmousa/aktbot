@@ -39,8 +39,20 @@ export async function proxy(req: NextRequest) {
   const zone = zoneForHost(host);
   const { pathname } = req.nextUrl;
 
-  // منطقة الرابط العامّة: لا منطق جلسات إطلاقاً (تُبنى لاحقاً).
+  // منطقة الرابط العامّة: لا منطق جلسات إطلاقاً.
+  // aktbot.link/<username> → إعادة كتابة داخليّة إلى /u/<username>.
   if (zone === "link") {
+    const seg = pathname.split("/").filter(Boolean);
+    if (
+      seg.length === 1 &&
+      !pathname.startsWith("/u/") &&
+      !pathname.startsWith("/api/") &&
+      !pathname.startsWith("/_next/")
+    ) {
+      const url = req.nextUrl.clone();
+      url.pathname = `/u/${seg[0]}`;
+      return NextResponse.rewrite(url);
+    }
     return NextResponse.next();
   }
 
