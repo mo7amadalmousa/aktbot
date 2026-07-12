@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
-import { resolveThemeId } from "@/lib/public/themes";
+import { resolvePageTheme } from "@/lib/public/page-theme";
 import { asRecord } from "@/lib/public/block-config";
 import { CreatorEditor } from "@/components/dashboard/creator-editor";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
@@ -41,7 +41,7 @@ export default async function DashboardPage() {
       language: profile.language,
       direction: profile.direction,
     },
-    themeId: resolveThemeId(asRecord(profile.page?.theme).id),
+    theme: resolvePageTheme(profile.page?.theme),
     background: asRecord(profile.page?.background),
     blocks: (profile.page?.blocks ?? []).map((b) => ({
       key: b.id,

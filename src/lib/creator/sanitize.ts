@@ -1,7 +1,7 @@
 import { safeHref, parseEmbed } from "@/lib/public/safe-url";
 import { SAFE_CSS_COLOR, SAFE_CSS_GRADIENT } from "@/lib/public/background";
 import { asRecord, str, num, arr } from "@/lib/public/block-config";
-import { resolveThemeId } from "@/lib/public/themes";
+import { resolvePageTheme } from "@/lib/public/page-theme";
 import { isKnownPlatform } from "@/lib/public/social-platforms";
 import { isSupportedCurrency } from "@/lib/payments/money";
 import { isManagedMediaUrl } from "@/lib/storage";
@@ -271,9 +271,28 @@ export interface CleanSave {
   username: string;
   socialLinks: Record<string, string>;
   isPublished: boolean;
-  theme: { id: string };
+  theme: Record<string, unknown>;
   background: Record<string, unknown>;
   blocks: CleanBlock[];
+}
+
+// قالب الصفحة الموسّع (layout/ألوان/خط/تبويبات) + تنقية رابط Sticky CTA.
+function sanitizeTheme(raw: unknown): Record<string, unknown> {
+  const t = resolvePageTheme(raw);
+  const stickyUrl = t.stickyCta.url ? webUrl(t.stickyCta.url) : null;
+  return {
+    id: t.id,
+    layout: t.layout,
+    fontFamily: t.fontFamily,
+    colors: t.colors,
+    tabs: t.tabs,
+    stickyCta: {
+      enabled: t.stickyCta.enabled,
+      ...(t.stickyCta.blockId ? { blockId: t.stickyCta.blockId } : {}),
+      ...(t.stickyCta.label ? { label: t.stickyCta.label } : {}),
+      ...(stickyUrl ? { url: stickyUrl } : {}),
+    },
+  };
 }
 
 export function sanitizeSave(raw: unknown): CleanSave {
@@ -293,10 +312,13 @@ export function sanitizeSave(raw: unknown): CleanSave {
     if (!VALID_TYPES.has(type)) {
       throw new SanitizeError("نوع بلوك غير معروف.");
     }
+    const cfg = sanitizeBlockConfig(type, r.config) as Record<string, unknown>;
+    const tabId = str(asRecord(r.config).tabId); // إسناد التبويب
+    if (tabId) cfg.tabId = tabId.slice(0, 40);
     return {
       id: typeof r.id === "string" ? r.id : undefined,
       type,
-      config: sanitizeBlockConfig(type, r.config),
+      config: cfg,
       visibility: r.visibility !== false,
       order: i,
     };
@@ -309,7 +331,7 @@ export function sanitizeSave(raw: unknown): CleanSave {
     username,
     socialLinks: sanitizeSocial(profile.socialLinks),
     isPublished: Boolean(profile.isPublished),
-    theme: { id: resolveThemeId(asRecord(p.theme).id) },
+    theme: sanitizeTheme(p.theme),
     background: sanitizeBackground(p.background),
     blocks,
   };

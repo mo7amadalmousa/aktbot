@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ExternalLink, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { EditorBlock, EditorInitial, EditorProfile } from "@/lib/creator/editor-types";
+import type { PageTheme } from "@/lib/public/page-theme";
 import { BlocksPanel } from "./blocks-panel";
 import { DesignPanel } from "./design-panel";
 import { ProfilePanel } from "./profile-panel";
@@ -13,7 +14,7 @@ type Tab = "content" | "design" | "profile";
 
 export function CreatorEditor({ initial }: { initial: EditorInitial }) {
   const [profile, setProfile] = useState<EditorProfile>(initial.profile);
-  const [themeId, setThemeId] = useState(initial.themeId);
+  const [theme, setTheme] = useState<PageTheme>(initial.theme);
   const [background, setBackground] = useState(initial.background);
   const [blocks, setBlocks] = useState<EditorBlock[]>(initial.blocks);
   const [savedUsername, setSavedUsername] = useState(initial.profile.username);
@@ -21,9 +22,7 @@ export function CreatorEditor({ initial }: { initial: EditorInitial }) {
   const [tab, setTab] = useState<Tab>("content");
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{ kind: "ok" | "err"; text: string } | null>(
-    null,
-  );
+  const [message, setMessage] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
 
   const touch = useCallback(() => {
     setDirty(true);
@@ -32,6 +31,10 @@ export function CreatorEditor({ initial }: { initial: EditorInitial }) {
 
   const patchProfile = (patch: Partial<EditorProfile>) => {
     setProfile((p) => ({ ...p, ...patch }));
+    touch();
+  };
+  const patchTheme = (patch: Partial<PageTheme>) => {
+    setTheme((t) => ({ ...t, ...patch }));
     touch();
   };
 
@@ -61,7 +64,7 @@ export function CreatorEditor({ initial }: { initial: EditorInitial }) {
             isPublished: profile.isPublished,
             socialLinks: profile.socialLinks,
           },
-          theme: { id: themeId },
+          theme,
           background,
           blocks: blocks.map((b) => ({
             id: b.id,
@@ -76,7 +79,6 @@ export function CreatorEditor({ initial }: { initial: EditorInitial }) {
         setMessage({ kind: "err", text: data.error || "تعذّر الحفظ." });
         return;
       }
-      // مزامنة معرّفات البلوكات الجديدة من الخادم (بالترتيب).
       const ids: string[] = data.blockIds ?? [];
       setBlocks((prev) => prev.map((b, i) => ({ ...b, id: ids[i] ?? b.id })));
       setSavedUsername(data.username ?? profile.username);
@@ -93,7 +95,6 @@ export function CreatorEditor({ initial }: { initial: EditorInitial }) {
 
   return (
     <div className="flex flex-1 flex-col">
-      {/* شريط علويّ */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-3">
         <div className="flex items-center gap-2">
           <h1 className="text-lg font-bold text-foreground">صفحتي</h1>
@@ -134,10 +135,8 @@ export function CreatorEditor({ initial }: { initial: EditorInitial }) {
         </div>
       </div>
 
-      {/* عمودان: محرّر (يمين RTL) + معاينة (يسار) */}
       <div className="flex flex-1 flex-col gap-6 p-5 lg:flex-row">
         <div className="flex-1 lg:max-w-md">
-          {/* تبويبات */}
           <div className="mb-4 flex gap-1 rounded-xl bg-muted p-1">
             {(
               [
@@ -165,6 +164,7 @@ export function CreatorEditor({ initial }: { initial: EditorInitial }) {
           {tab === "content" ? (
             <BlocksPanel
               blocks={blocks}
+              tabs={theme.tabs}
               onChange={(b) => {
                 setBlocks(b);
                 touch();
@@ -173,16 +173,14 @@ export function CreatorEditor({ initial }: { initial: EditorInitial }) {
           ) : null}
           {tab === "design" ? (
             <DesignPanel
-              themeId={themeId}
-              onThemeChange={(id) => {
-                setThemeId(id);
-                touch();
-              }}
+              theme={theme}
+              onThemeChange={patchTheme}
               background={background}
               onBackgroundChange={(bg) => {
                 setBackground(bg);
                 touch();
               }}
+              blocks={blocks}
             />
           ) : null}
           {tab === "profile" ? (
@@ -194,14 +192,14 @@ export function CreatorEditor({ initial }: { initial: EditorInitial }) {
           ) : null}
         </div>
 
-        {/* معاينة حيّة */}
         <div className="flex-1">
           <div className="lg:sticky lg:top-5">
             <div className="mx-auto w-full max-w-sm overflow-hidden rounded-[2rem] border-8 border-foreground/90 bg-background shadow-xl">
-              <div className="h-[600px]">
+              {/* transform يجعل عناصر position:fixed (Sticky CTA) محصورة داخل الإطار */}
+              <div className="h-[600px]" style={{ transform: "translateZ(0)" }}>
                 <LivePreview
                   profile={profile}
-                  themeId={themeId}
+                  theme={theme}
                   background={background}
                   blocks={blocks}
                 />

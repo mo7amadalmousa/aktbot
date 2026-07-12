@@ -34,7 +34,7 @@ import {
   Plus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { str, arr } from "@/lib/public/block-config";
+import { str, arr, asRecord } from "@/lib/public/block-config";
 import {
   ALL_BLOCK_TYPES,
   BLOCK_META,
@@ -64,6 +64,7 @@ function SortableRow({
   index,
   total,
   editing,
+  tabs,
   onToggleEdit,
   onMove,
   onUpdate,
@@ -73,6 +74,7 @@ function SortableRow({
   index: number;
   total: number;
   editing: boolean;
+  tabs: { id: string; label: string }[];
   onToggleEdit: () => void;
   onMove: (index: number, dir: -1 | 1) => void;
   onUpdate: (key: string, patch: Partial<EditorBlock>) => void;
@@ -178,6 +180,29 @@ function SortableRow({
 
       {editing ? (
         <div className="border-t border-border p-3">
+          {tabs.length > 0 ? (
+            <label className="mb-3 block">
+              <span className="mb-1 block text-xs font-medium text-foreground">
+                التبويب
+              </span>
+              <select
+                value={str(asRecord(block.config).tabId)}
+                onChange={(e) =>
+                  onUpdate(block.key, {
+                    config: { ...block.config, tabId: e.target.value },
+                  })
+                }
+                className="h-9 w-full rounded-lg border border-input bg-background px-2 text-sm text-foreground"
+              >
+                <option value="">التبويب الأوّل</option>
+                {tabs.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           {renderBlockEditor(block.type, {
             config: block.config,
             onChange: (c) => onUpdate(block.key, { config: c }),
@@ -191,9 +216,11 @@ function SortableRow({
 export function BlocksPanel({
   blocks,
   onChange,
+  tabs = [],
 }: {
   blocks: EditorBlock[];
   onChange: (blocks: EditorBlock[]) => void;
+  tabs?: { id: string; label: string }[];
 }) {
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -260,6 +287,7 @@ export function BlocksPanel({
                 block={block}
                 index={i}
                 total={blocks.length}
+                tabs={tabs}
                 editing={editingKey === block.key}
                 onToggleEdit={() =>
                   setEditingKey(editingKey === block.key ? null : block.key)

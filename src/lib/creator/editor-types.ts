@@ -1,4 +1,5 @@
 import type { BlockType } from "@/generated/prisma/enums";
+import type { PageTheme } from "@/lib/public/page-theme";
 
 // قائمة الأنواع (نصّية — تُبقي عميل Prisma خارج حزمة العميل).
 export const ALL_BLOCK_TYPES = [
@@ -124,7 +125,7 @@ export interface EditorProfile {
 
 export interface EditorInitial {
   profile: EditorProfile;
-  themeId: string;
+  theme: PageTheme;
   background: Record<string, unknown>;
   blocks: EditorBlock[];
 }
