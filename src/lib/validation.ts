@@ -12,8 +12,8 @@ export function normalizeUsername(u: string): string {
   return u.trim().toLowerCase();
 }
 
-// 3–30 حرفاً · أحرف إنجليزية صغيرة/أرقام/شرطة · لا تبدأ أو تنتهي بشرطة.
-const USERNAME_RE = /^[a-z0-9](?:[a-z0-9-]{1,28}[a-z0-9])$/;
+// 3–30 حرفاً · أحرف إنجليزية صغيرة/أرقام/نقطة/شرطة/شرطة سفلية · تبدأ وتنتهي بحرف أو رقم.
+const USERNAME_RE = /^[a-z0-9][a-z0-9._-]{1,28}[a-z0-9]$/;
 
 // أسماء محجوزة (مسارات النظام والنطاقات الفرعية).
 const RESERVED_USERNAMES = new Set([
@@ -49,7 +49,8 @@ export function validateUsername(input: string): UsernameCheck {
   if (!USERNAME_RE.test(u)) {
     return {
       ok: false,
-      error: "أحرف إنجليزية صغيرة وأرقام وشرطة فقط، ولا يبدأ/ينتهي بشرطة.",
+      error:
+        "أحرف إنجليزية صغيرة وأرقام ونقطة وشرطة وشرطة سفلية، ويبدأ/ينتهي بحرف أو رقم.",
     };
   }
   if (RESERVED_USERNAMES.has(u)) {

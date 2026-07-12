@@ -19,8 +19,8 @@ type BgInput = {
   videoUrl?: string;
 };
 
-const SAFE_CSS_COLOR = /^#[0-9a-fA-F]{3,8}$|^rgb[a]?\([0-9.,%\s]+\)$/;
-const SAFE_CSS_GRADIENT = /^(linear|radial|conic)-gradient\([^;{}<>]*\)$/;
+export const SAFE_CSS_COLOR = /^#[0-9a-fA-F]{3,8}$|^rgb[a]?\([0-9.,%\s]+\)$/;
+export const SAFE_CSS_GRADIENT = /^(linear|radial|conic)-gradient\([^;{}<>]*\)$/;
 
 export function resolveBackground(
   raw: unknown,
