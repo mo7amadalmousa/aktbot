@@ -233,13 +233,39 @@ async function main() {
           ],
         },
       },
-      { type: "STORE", order: 2, config: { title: "منتجاتي المختارة" } },
+      {
+        type: "STORE",
+        order: 2,
+        config: {
+          title: "منتجاتي المختارة",
+          products: [
+            {
+              title: "أحمر شفاه مطفّي",
+              price: 24,
+              currency: "USD",
+              url: "https://example.com/shop/lipstick",
+              imageUrl: "https://images.unsplash.com/photo-1586495777744-4413f21062fa?w=400&q=80",
+            },
+            {
+              title: "كريم أساس",
+              price: 32,
+              currency: "USD",
+              url: "https://example.com/shop/foundation",
+              imageUrl: "https://images.unsplash.com/photo-1631730359585-38a4935cbec4?w=400&q=80",
+            },
+          ],
+        },
+      },
       {
         type: "NEWSLETTER",
         order: 3,
-        config: { title: "نشرتي الأسبوعية", description: "نصائح ميك أب كل أسبوع" },
+        config: {
+          title: "نشرتي الأسبوعية",
+          description: "نصائح ميك أب كل أسبوع في بريدك.",
+          buttonLabel: "اشتراك",
+        },
       },
-      { type: "QR", order: 4, config: { title: "بطاقتي الرقمية" } },
+      { type: "QR", order: 4, config: { title: "شارك صفحتي" } },
     ],
   });
 

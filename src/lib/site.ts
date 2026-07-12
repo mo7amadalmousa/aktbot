@@ -17,3 +17,10 @@ export function appUrl(path = "/"): string {
 
 export const SIGNUP_URL = appUrl("/signup");
 export const LOGIN_URL = appUrl("/login");
+
+// رابط الصفحة العامّة للمبدع (aktbot.link/username إنتاجاً · /u/username محلياً).
+export function publicPageUrl(username: string): string {
+  const link = process.env.NEXT_PUBLIC_LINK_BASE_URL?.replace(/\/$/, "");
+  if (link) return `${link}/${username}`;
+  return `${appUrl("/u")}/${username}`;
+}

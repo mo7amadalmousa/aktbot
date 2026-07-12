@@ -7,6 +7,9 @@ import { FormBlock } from "@/components/public/blocks/form-block";
 import { OfferBlock } from "@/components/public/blocks/offer-block";
 import { BeforeAfterBlock } from "@/components/public/blocks/before-after-block";
 import { StoryBlock } from "@/components/public/blocks/story-block";
+import { StoreBlock } from "@/components/public/blocks/store-block";
+import { NewsletterBlock } from "@/components/public/blocks/newsletter-block";
+import { QrBlock } from "@/components/public/blocks/qr-block";
 import { ComingSoonBlock } from "@/components/public/blocks/coming-soon-block";
 
 // ── سجلّ البلوكات: type → مكوّن عرض ───────────────────────────────────
@@ -19,6 +22,7 @@ type RenderArgs = {
   type: BlockType;
   blockId: string;
   interactive: boolean;
+  username?: string;
 };
 type BlockRenderer = (args: RenderArgs) => ReactNode;
 
@@ -56,7 +60,14 @@ export const blockRegistry: Partial<Record<BlockType, BlockRenderer>> = {
   STORY: ({ config, blockId }) => (
     <StoryBlock config={config} blockId={blockId} />
   ),
-  // STORE / NEWSLETTER / QR غير مسجّلة عمداً → ComingSoonBlock (موجات لاحقة).
+  STORE: ({ config, frosted }) => <StoreBlock config={config} frosted={frosted} />,
+  NEWSLETTER: ({ config, frosted, username }) => (
+    <NewsletterBlock config={config} username={username} frosted={frosted} />
+  ),
+  QR: ({ config, frosted, username }) => (
+    <QrBlock config={config} username={username} frosted={frosted} />
+  ),
+  // كل الأنواع مسجّلة الآن — لا نوع «قريباً».
 };
 
 export interface PublicBlock {
@@ -68,7 +79,7 @@ export interface PublicBlock {
 export function renderBlock(
   block: PublicBlock,
   frosted: boolean,
-  opts?: { interactive?: boolean },
+  opts?: { interactive?: boolean; username?: string },
 ): ReactNode {
   const renderer = blockRegistry[block.type];
   if (renderer) {
@@ -78,6 +89,7 @@ export function renderBlock(
       type: block.type,
       blockId: block.id,
       interactive: opts?.interactive ?? false,
+      username: opts?.username,
     });
   }
   return (

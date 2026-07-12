@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LayoutGrid, ShoppingBag, Wallet, BarChart3 } from "lucide-react";
+import { LayoutGrid, ShoppingBag, Mail, Wallet, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // هيكل الداشبورد المشترك (سايدبار + شريط جوّال) — يعاد استخدامه في المحرّر والطلبات.
@@ -13,12 +13,12 @@ export function DashboardShell({
   email,
   children,
 }: {
-  active: "page" | "orders";
+  active: "page" | "orders" | "subscribers";
   email: string;
   children: React.ReactNode;
 }) {
   const navItem = (
-    key: "page" | "orders",
+    key: "page" | "orders" | "subscribers",
     href: string,
     label: string,
     Icon: typeof LayoutGrid,
@@ -48,6 +48,7 @@ export function DashboardShell({
         <nav className="flex-1 space-y-1 px-3 py-2">
           {navItem("page", "/dashboard", "صفحتي", LayoutGrid)}
           {navItem("orders", "/dashboard/orders", "الطلبات", ShoppingBag)}
+          {navItem("subscribers", "/dashboard/subscribers", "المشتركون", Mail)}
           {NAV_SOON.map(({ label, Icon }) => (
             <span
               key={label}

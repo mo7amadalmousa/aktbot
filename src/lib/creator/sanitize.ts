@@ -181,8 +181,35 @@ function sanitizeBlockConfig(type: string, config: unknown): unknown {
         media,
       };
     }
+    case "STORE": {
+      const products = arr(c.products)
+        .map((p) => {
+          const r = asRecord(p);
+          const price = num(r.price);
+          return {
+            imageUrl: imageUrl(r.imageUrl) ?? "",
+            title: str(r.title).slice(0, 120),
+            url: webUrl(r.url) ?? "", // رابط خبيث/غير http(s) → يُسقَط
+            currency: str(r.currency).slice(0, 8),
+            ...(price !== null && price > 0 ? { price } : {}),
+          };
+        })
+        .filter((p) => p.title || p.url || p.imageUrl)
+        .slice(0, 30);
+      return { title: str(c.title).slice(0, 120), products };
+    }
+    case "NEWSLETTER": {
+      return {
+        title: str(c.title).slice(0, 120) || "اشترك",
+        description: str(c.description).slice(0, 300),
+        buttonLabel: str(c.buttonLabel).slice(0, 40) || "اشتراك",
+      };
+    }
+    case "QR": {
+      // لا إدخال حرّ — الرمز يُولَّد لرابط الصفحة من username خادميّاً.
+      return { title: str(c.title).slice(0, 120) };
+    }
     default: {
-      // STORE / NEWSLETTER / QR — عرض أساسيّ.
       return {
         title: str(c.title).slice(0, 120),
         description: str(c.description).slice(0, 400),

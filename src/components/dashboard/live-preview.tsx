@@ -79,6 +79,7 @@ export function LivePreview({
                 {renderBlock(
                   { id: b.key, type: b.type as BlockType, config: b.config },
                   frosted,
+                  { username: profile.username },
                 )}
               </div>
             ))

@@ -26,9 +26,9 @@ export const BLOCK_META: Record<
   FORM: { label: "نموذج تواصل", hint: "حقول تواصل", addable: true },
   CONSULTATION: { label: "استشارة مدفوعة", hint: "حجز جلسة بسعر", addable: true },
   PAID_VIDEO: { label: "فيديو خاص مدفوع", hint: "طلب فيديو بسعر", addable: true },
-  STORE: { label: "متجر", hint: "قريباً", addable: false },
-  NEWSLETTER: { label: "نشرة بريدية", hint: "قريباً", addable: false },
-  QR: { label: "رمز QR", hint: "قريباً", addable: false },
+  STORE: { label: "متجر", hint: "منتجات بروابط شراء", addable: true },
+  NEWSLETTER: { label: "نشرة بريدية", hint: "جمع اشتراكات بالبريد", addable: true },
+  QR: { label: "رمز QR", hint: "رمز صفحتك للمشاركة", addable: true },
   BEFORE_AFTER: { label: "قبل / بعد", hint: "سلايدر مقارنة صورتين", addable: true },
   STORY: { label: "ستوري", hint: "نشر مؤقّت (24 ساعة أو مشاهدة واحدة)", addable: true },
 };
@@ -81,6 +81,16 @@ export function defaultBlockConfig(type: string): Record<string, unknown> {
         publishedAt: Date.now(),
         media: [],
       };
+    case "STORE":
+      return { title: "متجري المختار", products: [] };
+    case "NEWSLETTER":
+      return {
+        title: "اشترك في نشرتي",
+        description: "نصائح ومحتوى حصريّ في بريدك.",
+        buttonLabel: "اشتراك",
+      };
+    case "QR":
+      return { title: "رمز صفحتي" };
     default:
       return { title: "" };
   }

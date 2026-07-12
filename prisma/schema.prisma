@@ -110,9 +110,23 @@ model CreatorProfile {
   socialLinks   Json? // { instagram, tiktok, youtube, x, website, ... } — تُنقّى عند الإدخال لاحقاً
   createdAt   DateTime @default(now())
 
-  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  page   Page?
-  orders Order[]
+  user        User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  page        Page?
+  orders      Order[]
+  subscribers NewsletterSubscriber[]
+}
+
+// مشتركو النشرة البريديّة لكل مبدع (جمع فقط الآن؛ إرسال الحملات لاحقاً).
+model NewsletterSubscriber {
+  id               String   @id @default(cuid())
+  creatorProfileId String
+  email            String
+  createdAt        DateTime @default(now())
+
+  creatorProfile CreatorProfile @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([creatorProfileId, email])
+  @@index([creatorProfileId])
 }
 
 model Page {
