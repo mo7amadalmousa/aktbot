@@ -7,6 +7,7 @@ import { ImageUpload } from "@/components/dashboard/image-upload";
 import { str } from "@/lib/public/block-config";
 import { THEME_IDS, THEME_META, themePageBackground } from "@/lib/public/themes";
 import { LAYOUTS, type PageTheme } from "@/lib/public/page-theme";
+import { LayoutThumbnail } from "@/components/dashboard/layout-thumbnail";
 import { FONTS } from "@/lib/public/fonts";
 import type { EditorBlock } from "@/lib/creator/editor-types";
 import { BLOCK_META } from "@/lib/creator/editor-types";
@@ -64,16 +65,17 @@ export function DesignPanel({
               type="button"
               onClick={() => onThemeChange({ layout: l.id })}
               className={cn(
-                "rounded-xl border p-3 text-start transition-colors",
+                "rounded-xl border p-2 text-start transition-colors",
                 theme.layout === l.id
                   ? "border-primary ring-2 ring-primary/30"
                   : "border-border hover:border-primary/50",
               )}
             >
-              <span className="block text-sm font-semibold text-foreground">
+              <LayoutThumbnail layout={l.id} />
+              <span className="mt-2 block text-sm font-semibold text-foreground">
                 {l.label}
               </span>
-              <span className="mt-0.5 block text-[11px] text-muted-foreground">
+              <span className="block text-[11px] text-muted-foreground">
                 {l.desc}
               </span>
             </button>
