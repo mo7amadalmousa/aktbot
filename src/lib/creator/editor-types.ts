@@ -15,6 +15,7 @@ export const ALL_BLOCK_TYPES = [
   "BEFORE_AFTER",
   "STORY",
   "SOCIAL",
+  "DISCOUNT",
 ] as const;
 
 // وصف كل نوع للمحرّر. addable=false → «قريباً» (لا يُضاف؛ الموجود يُرتَّب/يُخفى/يُحذف).
@@ -34,6 +35,7 @@ export const BLOCK_META: Record<
   BEFORE_AFTER: { label: "قبل / بعد", hint: "سلايدر مقارنة صورتين", addable: true },
   STORY: { label: "ستوري", hint: "نشر مؤقّت (24 ساعة أو مشاهدة واحدة)", addable: true },
   SOCIAL: { label: "تواصل اجتماعي", hint: "أيقونات روابط منصّاتك", addable: true },
+  DISCOUNT: { label: "خصومات", hint: "كوبونات مع زرّ نسخ", addable: true },
 };
 
 // config افتراضيّ عند إضافة بلوك جديد.
@@ -96,6 +98,20 @@ export function defaultBlockConfig(type: string): Record<string, unknown> {
       return { title: "رمز صفحتي" };
     case "SOCIAL":
       return { links: [{ platform: "instagram", url: "" }] };
+    case "DISCOUNT":
+      return {
+        title: "خصوماتي",
+        showCount: true,
+        coupons: [
+          {
+            id: crypto.randomUUID().slice(0, 10),
+            brandName: "",
+            description: "",
+            code: "",
+            url: "",
+          },
+        ],
+      };
     default:
       return { title: "" };
   }

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { safeHref, parseEmbed } from "@/lib/public/safe-url";
 import { SAFE_CSS_COLOR, SAFE_CSS_GRADIENT } from "@/lib/public/background";
 import { asRecord, str, num, arr } from "@/lib/public/block-config";
@@ -209,6 +210,31 @@ function sanitizeBlockConfig(type: string, config: unknown): unknown {
     case "QR": {
       // لا إدخال حرّ — الرمز يُولَّد لرابط الصفحة من username خادميّاً.
       return { title: str(c.title).slice(0, 120) };
+    }
+    case "DISCOUNT": {
+      const coupons = arr(c.coupons)
+        .map((cp) => {
+          const r = asRecord(cp);
+          const id = str(r.id) || randomUUID().slice(0, 10);
+          const brandName = str(r.brandName).slice(0, 60);
+          const code = str(r.code).slice(0, 40);
+          if (!brandName && !code) return null;
+          return {
+            id,
+            brandName,
+            description: str(r.description).slice(0, 120),
+            code,
+            logoUrl: imageUrl(r.logoUrl) ?? "",
+            url: webUrl(r.url) ?? "", // رابط خبيث/غير http(s) → يُسقَط
+          };
+        })
+        .filter((x): x is NonNullable<typeof x> => x !== null)
+        .slice(0, 30);
+      return {
+        title: str(c.title).slice(0, 120),
+        showCount: c.showCount !== false,
+        coupons,
+      };
     }
     case "SOCIAL": {
       const links = arr(c.links)

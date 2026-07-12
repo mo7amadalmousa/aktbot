@@ -206,6 +206,30 @@ async function main() {
           ],
         },
       },
+      {
+        type: "DISCOUNT",
+        order: 9,
+        config: {
+          title: "خصوماتي",
+          showCount: true,
+          coupons: [
+            {
+              id: "noon10",
+              brandName: "Noon",
+              description: "خصم 10% بكودي الخاص",
+              code: "ALFAN131",
+              url: "https://www.noon.com",
+            },
+            {
+              id: "trendyol40",
+              brandName: "Trendyol",
+              description: "خصم 40% بكودي",
+              code: "MFAT",
+              url: "https://www.trendyol.com",
+            },
+          ],
+        },
+      },
     ],
   });
 

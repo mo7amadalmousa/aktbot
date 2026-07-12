@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { asRecord, str, num } from "@/lib/public/block-config";
+import { asRecord, str, num, arr } from "@/lib/public/block-config";
 import { resolvePageTheme } from "@/lib/public/page-theme";
 import { PublicPageBody } from "@/components/public/public-page-body";
 
@@ -30,9 +30,25 @@ export default async function PublicPage({
 
   const theme = resolvePageTheme(profile.page?.theme);
 
+  const allBlocks = profile.page?.blocks ?? [];
+
+  // عدّادات نسخ الكوبونات (مجمّعة) — تُحقن في config (cache-safe، تقريبيّة).
+  const discountIds = allBlocks.filter((b) => b.type === "DISCOUNT").map((b) => b.id);
+  const counters = discountIds.length
+    ? await prisma.couponCounter.findMany({
+        where: { blockId: { in: discountIds } },
+        select: { blockId: true, couponId: true, count: true },
+      })
+    : [];
+  const countMap = new Map<string, Map<string, number>>();
+  for (const cc of counters) {
+    if (!countMap.has(cc.blockId)) countMap.set(cc.blockId, new Map());
+    countMap.get(cc.blockId)!.set(cc.couponId, cc.count);
+  }
+
   // فلترة خادميّة: أخفِ ستوري TIME_24H المنتهية.
   const now = Date.now();
-  const blocks = (profile.page?.blocks ?? [])
+  const blocks = allBlocks
     .filter((b) => {
       if (b.type !== "STORY") return true;
       const cfg = asRecord(b.config);
@@ -42,7 +58,18 @@ export default async function PublicPage({
       }
       return true;
     })
-    .map((b) => ({ id: b.id, type: b.type, config: b.config }));
+    .map((b) => {
+      if (b.type === "DISCOUNT") {
+        const cfg = asRecord(b.config);
+        const cm = countMap.get(b.id);
+        const coupons = arr(cfg.coupons).map((cp) => {
+          const r = asRecord(cp);
+          return { ...r, copyCount: cm?.get(str(r.id)) ?? 0 };
+        });
+        return { id: b.id, type: b.type, config: { ...cfg, coupons } };
+      }
+      return { id: b.id, type: b.type, config: b.config };
+    });
 
   return (
     <PublicPageBody

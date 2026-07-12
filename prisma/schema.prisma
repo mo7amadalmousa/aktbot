@@ -39,6 +39,7 @@ enum BlockType {
   BEFORE_AFTER
   STORY
   SOCIAL
+  DISCOUNT
 }
 
 // ── المستخدم والمصادقة ───────────────────────────────────────────────
@@ -150,10 +151,25 @@ model Block {
   visibility Boolean   @default(true)
   createdAt  DateTime  @default(now())
 
-  page       Page        @relation(fields: [pageId], references: [id], onDelete: Cascade)
-  storyViews StoryView[]
+  page           Page            @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  storyViews     StoryView[]
+  couponCounters CouponCounter[]
 
   @@index([pageId])
+}
+
+// عدّاد نسخ كوبونات الخصم — مجمّع (أخفّ من صفّ لكل نسخة) · بيانات أفلييت للمبدع.
+model CouponCounter {
+  id        String   @id @default(cuid())
+  blockId   String
+  couponId  String
+  count     Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  block Block @relation(fields: [blockId], references: [id], onDelete: Cascade)
+
+  @@unique([blockId, couponId])
+  @@index([blockId])
 }
 
 // تتبّع مشاهدة ستوري VIEW_ONCE لكل زائر مجهول (visitorId = كوكي opaque، بلا هوية).
