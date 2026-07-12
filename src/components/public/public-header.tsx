@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { asRecord } from "@/lib/public/block-config";
 import { safeHref, safeCssUrl } from "@/lib/public/safe-url";
+import { ResponsiveImage } from "@/components/public/responsive-image";
 
 // lucide v1 أزال أيقونات العلامات التجارية → أيقونات عامّة معبّرة.
 const SOCIAL_ICONS: Record<string, LucideIcon> = {
@@ -64,11 +65,12 @@ export function PublicHeader({ profile }: { profile: HeaderProfile }) {
         }}
       >
         {avatar ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={avatar}
+          <ResponsiveImage
+            url={avatar}
+            variant="avatar"
             alt={profile.displayName}
             className="size-full object-cover"
+            sizes="96px"
           />
         ) : (
           <span>{initial}</span>

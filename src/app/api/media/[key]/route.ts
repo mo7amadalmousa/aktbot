@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readFromDisk, isValidKey } from "@/lib/storage/disk";
+import { baseKeyOf } from "@/lib/storage/asset";
 
 export const runtime = "nodejs";
 
 // يخدم الصور المخزّنة محلياً (LocalStorageAdapter). في الإنتاج (vps) تُخدَم عبر Nginx.
+// متغيّر مفقود (uuid@640.webp) → fallback للأساس (uuid.webp) — يدعم الصور القديمة.
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ key: string }> },
@@ -12,7 +14,11 @@ export async function GET(
   if (!isValidKey(key)) {
     return new NextResponse("Not found", { status: 404 });
   }
-  const data = await readFromDisk(key);
+  let data = await readFromDisk(key);
+  if (!data) {
+    const base = baseKeyOf(key);
+    if (base !== key) data = await readFromDisk(base);
+  }
   if (!data) {
     return new NextResponse("Not found", { status: 404 });
   }

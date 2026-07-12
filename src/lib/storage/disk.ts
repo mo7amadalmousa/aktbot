@@ -11,8 +11,8 @@ export function uploadDir(): string {
   );
 }
 
-// المفتاح يجب أن يكون اسم ملف بسيطاً (cuid.webp) — يمنع اجتياز المسار.
-const KEY_RE = /^[A-Za-z0-9_-]+\.webp$/;
+// المفتاح: اسم ملف بسيط (uuid.webp أو uuid@640.webp) — يمنع اجتياز المسار.
+const KEY_RE = /^[A-Za-z0-9_@-]+\.webp$/;
 
 export function isValidKey(key: string): boolean {
   return KEY_RE.test(key);

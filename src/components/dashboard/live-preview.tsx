@@ -5,6 +5,7 @@ import { resolveBackground } from "@/lib/public/background";
 import { renderBlock } from "@/lib/public/block-registry";
 import { PublicHeader } from "@/components/public/public-header";
 import { PublicFooter } from "@/components/public/public-footer";
+import { ResponsiveImage } from "@/components/public/responsive-image";
 import type { EditorBlock, EditorProfile } from "@/lib/creator/editor-types";
 import type { BlockType } from "@/generated/prisma/enums";
 
@@ -34,14 +35,12 @@ export function LivePreview({
       style={{ ...themeStyleVars(id), ...bg.baseStyle }}
     >
       {bg.imageUrl ? (
-        <div
-          aria-hidden
-          className="absolute inset-0"
-          style={{
-            backgroundImage: `url("${bg.imageUrl}")`,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-          }}
+        <ResponsiveImage
+          url={bg.imageUrl}
+          variant="background"
+          alt=""
+          className="absolute inset-0 size-full object-cover"
+          sizes="(max-width: 1024px) 100vw, 400px"
         />
       ) : null}
       {frosted && bg.imageUrl ? (

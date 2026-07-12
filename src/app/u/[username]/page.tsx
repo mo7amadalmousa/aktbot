@@ -10,6 +10,7 @@ import { asRecord } from "@/lib/public/block-config";
 import { renderBlock } from "@/lib/public/block-registry";
 import { PublicHeader } from "@/components/public/public-header";
 import { PublicFooter } from "@/components/public/public-footer";
+import { ResponsiveImage } from "@/components/public/responsive-image";
 
 // caching قويّ — الصفحة العامّة بلا مصادقة/كوكيز.
 export const revalidate = 300;
@@ -53,14 +54,12 @@ export default async function PublicPage({
       style={{ ...themeStyleVars(themeId), ...bg.baseStyle }}
     >
       {bg.imageUrl ? (
-        <div
-          aria-hidden
-          className="absolute inset-0"
-          style={{
-            backgroundImage: `url("${bg.imageUrl}")`,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-          }}
+        <ResponsiveImage
+          url={bg.imageUrl}
+          variant="background"
+          alt=""
+          className="absolute inset-0 size-full object-cover"
+          sizes="100vw"
         />
       ) : null}
       {frosted && bg.imageUrl ? (

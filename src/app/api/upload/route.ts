@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth/session";
-import { processImage, ImageError, type UploadVariant } from "@/lib/storage/image";
+import { processImageSet, ImageError, type UploadVariant } from "@/lib/storage/image";
 import { getStorageProvider, keyFromManagedUrl } from "@/lib/storage";
+import { allVariantKeys } from "@/lib/storage/asset";
 import { checkUploadRate } from "@/lib/storage/rate-limit";
 
 export const runtime = "nodejs";
@@ -37,32 +38,42 @@ export async function POST(req: NextRequest) {
 
   let processed;
   try {
-    processed = await processImage(buffer, variant);
+    processed = await processImageSet(buffer, variant);
   } catch (e) {
     const msg = e instanceof ImageError ? e.message : "تعذّرت معالجة الصورة.";
     return NextResponse.json({ ok: false, error: msg }, { status: 422 });
   }
 
   const storage = getStorageProvider();
-  const result = await storage.put({
-    key: processed.key,
-    data: processed.data,
-    contentType: processed.contentType,
-  });
+  // خزّن كل الأحجام (الأساس + المتغيّرات).
+  let baseResult = null;
+  for (const out of processed.outputs) {
+    const r = await storage.put({
+      key: out.key,
+      data: out.data,
+      contentType: processed.contentType,
+    });
+    if (out.key === processed.baseKey) baseResult = r;
+  }
 
   await prisma.mediaAsset.create({
-    data: { key: processed.key, userId: session.sub },
+    data: { key: processed.baseKey, userId: session.sub },
   });
 
-  // حذف الصورة القديمة عند الاستبدال (إن كانت مُدارة ومملوكة) — لا يتيمة.
+  // حذف الصورة القديمة (وكل متغيّراتها) عند الاستبدال — لا يتيمة.
   const oldKey = previousUrl ? keyFromManagedUrl(previousUrl) : null;
-  if (oldKey && oldKey !== processed.key) {
+  if (oldKey && oldKey !== processed.baseKey) {
     const owned = await prisma.mediaAsset.findUnique({ where: { key: oldKey } });
     if (owned && owned.userId === session.sub) {
-      await storage.delete(oldKey);
+      for (const k of allVariantKeys(oldKey)) await storage.delete(k);
       await prisma.mediaAsset.delete({ where: { key: oldKey } }).catch(() => {});
     }
   }
 
-  return NextResponse.json({ ok: true, url: result.url, key: result.key });
+  return NextResponse.json({
+    ok: true,
+    url: baseResult?.url ?? storage.getUrl(processed.baseKey),
+    key: processed.baseKey,
+    widths: processed.generatedWidths,
+  });
 }

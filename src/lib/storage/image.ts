@@ -1,16 +1,11 @@
 import { randomUUID } from "node:crypto";
 import sharp from "sharp";
+import { VARIANT_WIDTHS, type ImageVariant } from "./asset";
 
 // ── أمان ومعالجة الصور ────────────────────────────────────────────────
 export class ImageError extends Error {}
 
-export type UploadVariant = "avatar" | "background" | "gallery";
-
-const MAX_DIM: Record<UploadVariant, number> = {
-  avatar: 512,
-  background: 1920,
-  gallery: 1400,
-};
+export type UploadVariant = ImageVariant;
 
 export function maxUploadBytes(): number {
   const n = Number(process.env.UPLOAD_MAX_BYTES);
@@ -36,17 +31,20 @@ function detectImageType(buf: Buffer): "jpeg" | "png" | "webp" | null {
   return null;
 }
 
-export interface ProcessedImage {
-  key: string;
-  data: Buffer;
+export interface ProcessedSet {
+  baseKey: string;
   contentType: "image/webp";
+  outputs: { key: string; data: Buffer }[]; // الأساس + متغيّرات @w
+  generatedWidths: number[];
 }
 
-// يتحقّق ويعالج: تصغير + ضغط + webp + تنظيف EXIF (sharp يُسقط الميتاداتا افتراضياً).
-export async function processImage(
+// يتحقّق ويولّد عدّة أحجام responsive (webp · تنظيف EXIF بإسقاط الميتاداتا).
+// الأساس = أكبر عرض (بلا لاحقة)؛ المتغيّرات الأصغر @w. توليد المتغيّرات best-effort:
+// فشل حجمٍ لا يُفشل الرفع (يبقى الأساس على الأقلّ).
+export async function processImageSet(
   input: Buffer,
   variant: UploadVariant,
-): Promise<ProcessedImage> {
+): Promise<ProcessedSet> {
   if (input.length === 0) throw new ImageError("ملف فارغ.");
   if (input.length > maxUploadBytes()) {
     throw new ImageError(
@@ -59,21 +57,42 @@ export async function processImage(
     throw new ImageError("الملف ليس صورة صالحة (JPEG/PNG/WebP فقط).");
   }
 
-  const dim = MAX_DIM[variant];
-  let data: Buffer;
-  try {
-    data = await sharp(input)
+  const widths = VARIANT_WIDTHS[variant];
+  const maxW = widths[widths.length - 1];
+  const id = randomUUID();
+  const baseKey = `${id}.webp`;
+
+  async function render(w: number, quality: number): Promise<Buffer> {
+    return sharp(input)
       .rotate() // توجيه تلقائيّ من EXIF قبل إسقاطها
-      .resize(dim, dim, { fit: "inside", withoutEnlargement: true })
-      .webp({ quality: 82 })
+      .resize(w, w, { fit: "inside", withoutEnlargement: true })
+      .webp({ quality })
       .toBuffer();
+  }
+
+  // الأساس مطلوب.
+  let baseData: Buffer;
+  try {
+    baseData = await render(maxW, 82);
   } catch {
     throw new ImageError("تعذّرت معالجة الصورة.");
   }
 
-  return {
-    key: `${randomUUID()}.webp`,
-    data,
-    contentType: "image/webp",
-  };
+  const outputs: { key: string; data: Buffer }[] = [
+    { key: baseKey, data: baseData },
+  ];
+  const generatedWidths: number[] = [maxW];
+
+  // المتغيّرات الأصغر — best-effort.
+  for (const w of widths.slice(0, -1)) {
+    try {
+      const d = await render(w, 80);
+      outputs.push({ key: `${id}@${w}.webp`, data: d });
+      generatedWidths.push(w);
+    } catch {
+      // تخطّي هذا الحجم دون إفشال الرفع.
+    }
+  }
+
+  return { baseKey, contentType: "image/webp", outputs, generatedWidths };
 }

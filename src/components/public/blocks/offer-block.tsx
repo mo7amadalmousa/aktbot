@@ -1,6 +1,7 @@
 import { asRecord, str, num } from "@/lib/public/block-config";
 import { safeCssUrl } from "@/lib/public/safe-url";
 import { formatMoney, toMinor } from "@/lib/payments/money";
+import { ResponsiveImage } from "@/components/public/responsive-image";
 import { BlockShell } from "./block-shell";
 
 // CONSULTATION / PAID_VIDEO: بطاقة + سعر + زرّ شراء فعّال (على الصفحة العامّة).
@@ -42,13 +43,18 @@ export function OfferBlock({
     <BlockShell frosted={frosted}>
       <div className="flex items-start gap-3">
         {thumb ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={thumb}
-            alt=""
-            className="size-16 shrink-0 object-cover"
+          <div
+            className="size-16 shrink-0 overflow-hidden"
             style={{ borderRadius: "calc(var(--pp-radius) * 0.5)" }}
-          />
+          >
+            <ResponsiveImage
+              url={thumb}
+              variant="gallery"
+              alt=""
+              className="size-full object-cover"
+              sizes="64px"
+            />
+          </div>
         ) : null}
         <div className="min-w-0 flex-1">
           <p className="font-semibold">{title}</p>

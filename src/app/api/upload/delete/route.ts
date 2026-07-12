@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth/session";
 import { getStorageProvider, keyFromManagedUrl } from "@/lib/storage";
+import { allVariantKeys } from "@/lib/storage/asset";
 
 export const runtime = "nodejs";
 
@@ -32,7 +33,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "غير مصرّح." }, { status: 403 });
   }
 
-  await getStorageProvider().delete(key);
+  const storage = getStorageProvider();
+  for (const k of allVariantKeys(key)) await storage.delete(k);
   await prisma.mediaAsset.delete({ where: { key } }).catch(() => {});
   return NextResponse.json({ ok: true });
 }
