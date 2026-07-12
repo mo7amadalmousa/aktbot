@@ -6,7 +6,7 @@ import {
   THEME_META,
 } from "@/lib/public/themes";
 import { resolveBackground } from "@/lib/public/background";
-import { asRecord } from "@/lib/public/block-config";
+import { asRecord, str, num } from "@/lib/public/block-config";
 import { renderBlock } from "@/lib/public/block-registry";
 import { PublicHeader } from "@/components/public/public-header";
 import { PublicFooter } from "@/components/public/public-footer";
@@ -44,7 +44,17 @@ export default async function PublicPage({
   const frosted = THEME_META[themeId].frosted;
   const bg = resolveBackground(profile.page?.background, themeId);
   const dir = profile.direction === "ltr" ? "ltr" : "rtl";
-  const blocks = profile.page?.blocks ?? [];
+  // فلترة خادميّة: أخفِ ستوري TIME_24H المنتهية (لا تُعرَض ولا تُرسَل روابطها).
+  const now = Date.now();
+  const blocks = (profile.page?.blocks ?? []).filter((b) => {
+    if (b.type !== "STORY") return true;
+    const cfg = asRecord(b.config);
+    if (str(cfg.mode) !== "VIEW_ONCE") {
+      const pub = num(cfg.publishedAt) ?? 0;
+      if (pub > 0 && now > pub + 24 * 60 * 60 * 1000) return false;
+    }
+    return true;
+  });
 
   return (
     <div

@@ -11,6 +11,8 @@ export const ALL_BLOCK_TYPES = [
   "STORE",
   "NEWSLETTER",
   "QR",
+  "BEFORE_AFTER",
+  "STORY",
 ] as const;
 
 // وصف كل نوع للمحرّر. addable=false → «قريباً» (لا يُضاف؛ الموجود يُرتَّب/يُخفى/يُحذف).
@@ -27,6 +29,8 @@ export const BLOCK_META: Record<
   STORE: { label: "متجر", hint: "قريباً", addable: false },
   NEWSLETTER: { label: "نشرة بريدية", hint: "قريباً", addable: false },
   QR: { label: "رمز QR", hint: "قريباً", addable: false },
+  BEFORE_AFTER: { label: "قبل / بعد", hint: "سلايدر مقارنة صورتين", addable: true },
+  STORY: { label: "ستوري", hint: "نشر مؤقّت (24 ساعة أو مشاهدة واحدة)", addable: true },
 };
 
 // config افتراضيّ عند إضافة بلوك جديد.
@@ -61,6 +65,21 @@ export function defaultBlockConfig(type: string): Record<string, unknown> {
         description: "",
         price: 30,
         currency: "USD",
+      };
+    case "BEFORE_AFTER":
+      return {
+        beforeUrl: "",
+        afterUrl: "",
+        beforeLabel: "قبل",
+        afterLabel: "بعد",
+        orientation: "horizontal",
+      };
+    case "STORY":
+      return {
+        title: "ستوري",
+        mode: "TIME_24H",
+        publishedAt: Date.now(),
+        media: [],
       };
     default:
       return { title: "" };

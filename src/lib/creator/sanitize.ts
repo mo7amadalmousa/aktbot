@@ -152,6 +152,35 @@ function sanitizeBlockConfig(type: string, config: unknown): unknown {
         ...(thumb ? { thumbnailUrl: thumb } : {}),
       };
     }
+    case "BEFORE_AFTER": {
+      const orientation =
+        str(c.orientation) === "vertical" ? "vertical" : "horizontal";
+      return {
+        beforeUrl: imageUrl(c.beforeUrl) ?? "",
+        afterUrl: imageUrl(c.afterUrl) ?? "",
+        beforeLabel: str(c.beforeLabel).slice(0, 40),
+        afterLabel: str(c.afterLabel).slice(0, 40),
+        orientation,
+      };
+    }
+    case "STORY": {
+      const mode = str(c.mode) === "VIEW_ONCE" ? "VIEW_ONCE" : "TIME_24H";
+      const publishedAt = num(c.publishedAt) ?? Date.now();
+      const media = arr(c.media)
+        .map((it) => {
+          const r = asRecord(it);
+          const u = imageUrl(r.url);
+          return u ? { url: u } : null;
+        })
+        .filter((x): x is { url: string } => x !== null)
+        .slice(0, 10);
+      return {
+        title: str(c.title).slice(0, 120) || "ستوري",
+        mode,
+        publishedAt,
+        media,
+      };
+    }
     default: {
       // STORE / NEWSLETTER / QR — عرض أساسيّ.
       return {

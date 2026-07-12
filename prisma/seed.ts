@@ -174,6 +174,30 @@ async function main() {
           ],
         },
       },
+      {
+        type: "BEFORE_AFTER",
+        order: 6,
+        config: {
+          beforeUrl: "https://images.unsplash.com/photo-1512496015851-a90fb38ba796?w=800&q=80",
+          afterUrl: "https://images.unsplash.com/photo-1522337660859-02fbefca4702?w=800&q=80",
+          beforeLabel: "قبل",
+          afterLabel: "بعد",
+          orientation: "horizontal",
+        },
+      },
+      {
+        type: "STORY",
+        order: 7,
+        config: {
+          title: "روتين اليوم",
+          mode: "TIME_24H",
+          publishedAt: Date.now(),
+          media: [
+            { url: "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=800&q=80" },
+            { url: "https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=800&q=80" },
+          ],
+        },
+      },
     ],
   });
 

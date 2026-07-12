@@ -5,6 +5,8 @@ import { EmbedBlock } from "@/components/public/blocks/embed-block";
 import { GalleryBlock } from "@/components/public/blocks/gallery-block";
 import { FormBlock } from "@/components/public/blocks/form-block";
 import { OfferBlock } from "@/components/public/blocks/offer-block";
+import { BeforeAfterBlock } from "@/components/public/blocks/before-after-block";
+import { StoryBlock } from "@/components/public/blocks/story-block";
 import { ComingSoonBlock } from "@/components/public/blocks/coming-soon-block";
 
 // ── سجلّ البلوكات: type → مكوّن عرض ───────────────────────────────────
@@ -46,6 +48,13 @@ export const blockRegistry: Partial<Record<BlockType, BlockRenderer>> = {
       blockId={blockId}
       interactive={interactive}
     />
+  ),
+  // بصريّة
+  BEFORE_AFTER: ({ config, frosted }) => (
+    <BeforeAfterBlock config={config} frosted={frosted} />
+  ),
+  STORY: ({ config, blockId }) => (
+    <StoryBlock config={config} blockId={blockId} />
   ),
   // STORE / NEWSLETTER / QR غير مسجّلة عمداً → ComingSoonBlock (موجات لاحقة).
 };

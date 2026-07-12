@@ -36,6 +36,8 @@ enum BlockType {
   STORE
   NEWSLETTER
   QR
+  BEFORE_AFTER
+  STORY
 }
 
 // ── المستخدم والمصادقة ───────────────────────────────────────────────
@@ -133,9 +135,23 @@ model Block {
   visibility Boolean   @default(true)
   createdAt  DateTime  @default(now())
 
-  page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  page       Page        @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  storyViews StoryView[]
 
   @@index([pageId])
+}
+
+// تتبّع مشاهدة ستوري VIEW_ONCE لكل زائر مجهول (visitorId = كوكي opaque، بلا هوية).
+model StoryView {
+  id        String   @id @default(cuid())
+  blockId   String
+  visitorId String
+  createdAt DateTime @default(now())
+
+  block Block @relation(fields: [blockId], references: [id], onDelete: Cascade)
+
+  @@unique([blockId, visitorId])
+  @@index([blockId])
 }
 
 // ── الطلبات/المدفوعات (طبقة دفع محايدة) ──────────────────────────────

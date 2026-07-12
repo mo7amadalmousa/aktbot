@@ -6,6 +6,8 @@ import { EmbedEditor } from "./embed-editor";
 import { GalleryEditor } from "./gallery-editor";
 import { FormEditor } from "./form-editor";
 import { OfferEditor } from "./offer-editor";
+import { BeforeAfterEditor } from "./before-after-editor";
+import { StoryEditor } from "./story-editor";
 import { ComingSoonEditor } from "./coming-soon-editor";
 
 // ── سجلّ محرّرات البلوكات (موازٍ لـ block-registry في العرض) ───────────
@@ -23,6 +25,8 @@ const EDITORS: Record<string, (p: EditorProps) => ReactNode> = {
   FORM: FormEditor,
   CONSULTATION: (p) => <OfferEditor {...p} kind="consultation" />,
   PAID_VIDEO: (p) => <OfferEditor {...p} kind="paid_video" />,
+  BEFORE_AFTER: BeforeAfterEditor,
+  STORY: StoryEditor,
 };
 
 export function renderBlockEditor(
