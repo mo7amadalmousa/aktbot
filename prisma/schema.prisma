@@ -51,6 +51,19 @@ model User {
   creatorProfile          CreatorProfile?
   emailVerificationTokens EmailVerificationToken[]
   passwordResetTokens     PasswordResetToken[]
+  mediaAssets             MediaAsset[]
+}
+
+// أصل صورة مرفوع — يتتبّع الملكيّة (للحذف الآمن) والمفتاح على التخزين.
+model MediaAsset {
+  id        String   @id @default(cuid())
+  key       String   @unique // اسم الملف العشوائيّ على التخزين (cuid.webp)
+  userId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 // التوكنات مُخزّنة مجزّأة (sha256) لا نصاً صريحاً · صلاحية قصيرة · استخدام مرّة واحدة.

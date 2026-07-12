@@ -3,6 +3,7 @@ import { SAFE_CSS_COLOR, SAFE_CSS_GRADIENT } from "@/lib/public/background";
 import { asRecord, str, num, arr } from "@/lib/public/block-config";
 import { resolveThemeId } from "@/lib/public/themes";
 import { isSupportedCurrency } from "@/lib/payments/money";
+import { isManagedMediaUrl } from "@/lib/storage";
 import {
   normalizeUsername,
   validateUsername,
@@ -36,9 +37,22 @@ function requireWeb(raw: unknown, field: string): string {
   return u;
 }
 
-function optionalWeb(raw: unknown, field: string): string | null {
+// (avatar يستخدم optionalImage أدناه — يقبل روابط التخزين المُدارة)
+
+// رابط صورة: يقبل http(s) أو رابط تخزين مُدار (/api/media/... أو /media/...).
+function imageUrl(raw: unknown): string | null {
+  const s = safeHref(raw);
+  if (!s) return null;
+  if (isManagedMediaUrl(s)) return s;
+  if (/^https?:\/\//.test(s)) return s;
+  return null;
+}
+
+function optionalImage(raw: unknown, field: string): string | null {
   if (raw === undefined || raw === null || raw === "") return null;
-  return requireWeb(raw, field);
+  const u = imageUrl(raw);
+  if (!u) throw new SanitizeError(`${field}: رابط صورة غير صالح.`);
+  return u;
 }
 
 const VALID_TYPES = new Set<string>(ALL_BLOCK_TYPES);
@@ -90,7 +104,7 @@ function sanitizeBlockConfig(type: string, config: unknown): unknown {
       const images = arr(c.images)
         .map((it) => {
           const r = asRecord(it);
-          const u = webUrl(r.url);
+          const u = imageUrl(r.url);
           return u ? { url: u, alt: str(r.alt).slice(0, 160) } : null;
         })
         .filter((x): x is { url: string; alt: string } => x !== null)
@@ -126,7 +140,7 @@ function sanitizeBlockConfig(type: string, config: unknown): unknown {
       if (!isSupportedCurrency(currency)) {
         throw new SanitizeError("عملة غير مدعومة (USD أو TRY).");
       }
-      const thumb = webUrl(c.thumbnailUrl);
+      const thumb = imageUrl(c.thumbnailUrl);
       return {
         title:
           str(c.title).slice(0, 120) ||
@@ -162,9 +176,9 @@ function sanitizeBackground(raw: unknown): Record<string, unknown> {
     return {};
   }
   if (type === "image") {
-    const url = webUrl(b.imageUrl);
+    const url = imageUrl(b.imageUrl);
     if (!url) {
-      throw new SanitizeError("رابط صورة الخلفية غير صالح (http/https فقط).");
+      throw new SanitizeError("رابط صورة الخلفية غير صالح.");
     }
     return { type: "image", imageUrl: url };
   }
@@ -221,7 +235,7 @@ export function sanitizeSave(raw: unknown): CleanSave {
   return {
     displayName: displayName.slice(0, 120),
     bio: str(profile.bio).slice(0, 600) || null,
-    avatarUrl: optionalWeb(profile.avatarUrl, "الأفاتار"),
+    avatarUrl: optionalImage(profile.avatarUrl, "الأفاتار"),
     username,
     socialLinks: sanitizeSocial(profile.socialLinks),
     isPublished: Boolean(profile.isPublished),

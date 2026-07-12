@@ -2,6 +2,7 @@
 
 import { BadgeCheck } from "lucide-react";
 import { Field, TextInput, TextArea, Toggle } from "@/components/dashboard/field";
+import { ImageUpload } from "@/components/dashboard/image-upload";
 import type { EditorProfile } from "@/lib/creator/editor-types";
 
 const SOCIAL_FIELDS: { key: string; label: string; placeholder: string }[] = [
@@ -43,14 +44,17 @@ export function ProfilePanel({
         />
       </Field>
 
-      <Field label="رابط صورة الأفاتار" hint="http/https — رفع الصور قريباً">
-        <TextInput
+      <div>
+        <span className="mb-1 block text-xs font-medium text-foreground">
+          صورة الأفاتار
+        </span>
+        <ImageUpload
           value={profile.avatarUrl}
           onChange={(v) => onChange({ avatarUrl: v })}
-          placeholder="https://…/avatar.jpg"
-          type="url"
+          variant="avatar"
+          shape="circle"
         />
-      </Field>
+      </div>
 
       <Field
         label="اسم المستخدم (رابط صفحتك)"

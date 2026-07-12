@@ -37,6 +37,10 @@ yarn-error.log*
 # prisma generated client (regenerated via postinstall)
 /src/generated
 
+# uploaded media (stored outside repo by default; ignore if configured inside)
+/uploads
+/aktbot-uploads
+
 # vercel
 .vercel
 

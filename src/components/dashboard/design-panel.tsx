@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { Field, TextInput } from "@/components/dashboard/field";
+import { ImageUpload } from "@/components/dashboard/image-upload";
 import { str } from "@/lib/public/block-config";
 import {
   THEME_IDS,
@@ -138,16 +139,18 @@ export function DesignPanel({
         ) : null}
 
         {bgType === "image" ? (
-          <Field label="رابط صورة الخلفية" hint="http/https — رفع الصور قريباً">
-            <TextInput
+          <div>
+            <span className="mb-1 block text-xs font-medium text-foreground">
+              صورة الخلفية
+            </span>
+            <ImageUpload
               value={str(background.imageUrl)}
               onChange={(v) =>
                 onBackgroundChange({ type: "image", imageUrl: v })
               }
-              placeholder="https://…/background.jpg"
-              type="url"
+              variant="background"
             />
-          </Field>
+          </div>
         ) : null}
       </div>
     </div>
