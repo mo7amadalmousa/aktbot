@@ -5,7 +5,6 @@ import { cn } from "@/lib/utils";
 import { Field, TextInput, Toggle } from "@/components/dashboard/field";
 import { ImageUpload } from "@/components/dashboard/image-upload";
 import { str } from "@/lib/public/block-config";
-import { THEME_IDS, THEME_META, themePageBackground } from "@/lib/public/themes";
 import { LAYOUTS, type PageTheme } from "@/lib/public/page-theme";
 import { LayoutThumbnail } from "@/components/dashboard/layout-thumbnail";
 import { FONTS } from "@/lib/public/fonts";
@@ -79,28 +78,6 @@ export function DesignPanel({
                 {l.desc}
               </span>
             </button>
-          ))}
-        </div>
-      </div>
-
-      {/* لوحة الألوان */}
-      <div>
-        <p className="mb-2 text-sm font-semibold text-foreground">لوحة الألوان</p>
-        <div className="grid grid-cols-5 gap-2">
-          {THEME_IDS.map((id) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => onThemeChange({ id })}
-              title={THEME_META[id].label}
-              className={cn(
-                "h-12 rounded-lg border",
-                theme.id === id
-                  ? "border-primary ring-2 ring-primary/30"
-                  : "border-border",
-              )}
-              style={{ background: themePageBackground(id) }}
-            />
           ))}
         </div>
       </div>

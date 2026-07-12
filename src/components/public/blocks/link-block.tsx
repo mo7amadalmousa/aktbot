@@ -1,7 +1,7 @@
 import { asRecord, str } from "@/lib/public/block-config";
 import { safeHref } from "@/lib/public/safe-url";
 
-// LINK: زر رابط.
+// LINK: بطاقة رابط بنمط سطح القالب (--pp-surface) — مطابق .lnk في v2.
 export function LinkBlock({ config }: { config: unknown }) {
   const c = asRecord(config);
   const href = safeHref(c.url);
@@ -10,9 +10,9 @@ export function LinkBlock({ config }: { config: unknown }) {
 
   const inner = (
     <div className="flex flex-col items-center">
-      <span className="font-semibold">{label}</span>
+      <span className="font-bold">{label}</span>
       {subtitle ? (
-        <span className="mt-0.5 text-xs" style={{ opacity: 0.8 }}>
+        <span className="mt-0.5 text-xs" style={{ opacity: 0.7 }}>
           {subtitle}
         </span>
       ) : null}
@@ -20,19 +20,16 @@ export function LinkBlock({ config }: { config: unknown }) {
   );
 
   const style = {
-    background: "var(--pp-btn-bg)",
-    color: "var(--pp-btn-text)",
-    borderColor: "var(--pp-btn-border)",
-    borderRadius: "var(--pp-btn-radius)",
+    background: "var(--pp-surface)",
+    color: "var(--pp-text)",
+    borderColor: "var(--pp-surface-border)",
+    borderRadius: "var(--pp-radius)",
     boxShadow: "var(--pp-shadow)",
   } as React.CSSProperties;
 
   if (!href) {
     return (
-      <div
-        className="block w-full border px-5 py-4 text-center opacity-60"
-        style={style}
-      >
+      <div className="block w-full border px-5 py-4 text-center opacity-60" style={style}>
         {inner}
       </div>
     );

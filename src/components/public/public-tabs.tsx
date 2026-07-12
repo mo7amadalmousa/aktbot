@@ -18,17 +18,17 @@ export function PublicTabs({
             key={t.id}
             type="button"
             onClick={() => setActive(i)}
-            className="shrink-0 rounded-full border px-4 py-1.5 text-sm font-medium transition-colors"
+            className="shrink-0 rounded-full border px-4 py-1.5 text-sm font-bold transition-colors"
             style={
               i === active
                 ? {
-                    background: "var(--pp-btn-bg)",
-                    color: "var(--pp-btn-text)",
-                    borderColor: "var(--pp-btn-border)",
+                    background: "var(--pp-cta-bg)",
+                    color: "var(--pp-cta-text)",
+                    borderColor: "transparent",
                   }
                 : {
                     background: "var(--pp-surface)",
-                    color: "var(--pp-text)",
+                    color: "var(--pp-muted)",
                     borderColor: "var(--pp-surface-border)",
                   }
             }

@@ -103,12 +103,8 @@ async function main() {
       youtube: "https://youtube.com/@lina.beauty",
       website: "https://lina.example.com",
     },
-    theme: { id: "photo-bg" },
-    background: {
-      type: "image",
-      imageUrl:
-        "https://images.unsplash.com/photo-1512496015851-a90fb38ba796?w=1200&q=80",
-    },
+    theme: { layout: "CORAL", fontFamily: "tajawal" },
+    background: {},
     blocks: [
       {
         type: "LINK",
@@ -226,8 +222,8 @@ async function main() {
       instagram: "https://instagram.com/sara.glow",
       website: "https://sara.example.com",
     },
-    theme: { id: "mint" },
-    background: { type: "gradient" },
+    theme: { layout: "TENTACLES", fontFamily: "tajawal" },
+    background: {},
     blocks: [
       {
         type: "LINK",

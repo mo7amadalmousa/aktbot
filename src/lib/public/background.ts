@@ -1,5 +1,4 @@
 import type { CSSProperties } from "react";
-import { themePageBackground, type ThemeId } from "./themes";
 import { safeCssUrl } from "./safe-url";
 
 // ── محرّك الخلفية ─────────────────────────────────────────────────────
@@ -24,9 +23,9 @@ export const SAFE_CSS_GRADIENT = /^(linear|radial|conic)-gradient\([^;{}<>]*\)$/
 
 export function resolveBackground(
   raw: unknown,
-  themeId: ThemeId,
+  fallbackBg: string,
 ): ResolvedBackground {
-  const fallback = themePageBackground(themeId);
+  const fallback = fallbackBg;
   const bg = (raw ?? {}) as BgInput;
 
   if (bg.type === "color" && typeof bg.color === "string" && SAFE_CSS_COLOR.test(bg.color.trim())) {

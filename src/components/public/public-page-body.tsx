@@ -1,7 +1,12 @@
 import { cn } from "@/lib/utils";
 import { asRecord, str } from "@/lib/public/block-config";
 import { resolveBackground } from "@/lib/public/background";
-import { pageStyleVars, isFrosted, type PageTheme } from "@/lib/public/page-theme";
+import {
+  pageStyleVars,
+  isDarkLayout,
+  layoutPageBackground,
+  type PageTheme,
+} from "@/lib/public/page-theme";
 import { fontClassName } from "@/lib/public/fonts";
 import { resolveStickyCta } from "@/lib/public/sticky";
 import { LAYOUT_COMPONENTS, type LiteBlock } from "@/components/public/layouts";
@@ -21,8 +26,7 @@ export interface BodyProfile {
   direction: string;
 }
 
-// جسم الصفحة العامّة المشترك — تخطيط + تبويبات + Sticky CTA + خط + خلفية.
-// يُعاد استخدامه في /u/[username] (خادم) والمعاينة الحيّة (عميل).
+// جسم الصفحة العامّة المشترك — التخطيط (لوحته v2) + تبويبات + Sticky CTA + خط + خلفية.
 export function PublicPageBody({
   profile,
   theme,
@@ -39,21 +43,15 @@ export function PublicPageBody({
   interactive?: boolean;
 }) {
   const layout = LAYOUT_COMPONENTS[theme.layout];
-  const frosted = isFrosted(theme);
-  const bg = resolveBackground(background, theme.id);
+  const dark = isDarkLayout(theme);
+  const bg = resolveBackground(background, layoutPageBackground(theme.layout));
   const dir = profile.direction === "ltr" ? "ltr" : "rtl";
   const sticky = resolveStickyCta(theme.stickyCta, blocks);
 
   const blockArea = (bs: LiteBlock[]) => (
-    <layout.Blocks
-      blocks={bs}
-      frosted={frosted}
-      username={username}
-      interactive={interactive}
-    />
+    <layout.Blocks blocks={bs} username={username} interactive={interactive} />
   );
 
-  // تجميع البلوكات في تبويبات (إن وُجدت > 1). بلا tabId أو tab محذوف → أوّل تبويب.
   let content;
   if (theme.tabs.length > 1) {
     const ids = new Set(theme.tabs.map((t) => t.id));
@@ -79,7 +77,7 @@ export function PublicPageBody({
       className={cn(
         "relative min-h-dvh w-full",
         fontClassName(theme.fontFamily),
-        sticky && "pb-24",
+        sticky && "pb-28",
       )}
       style={{ ...pageStyleVars(theme), ...bg.baseStyle }}
     >
@@ -92,11 +90,11 @@ export function PublicPageBody({
           sizes="100vw"
         />
       ) : null}
-      {frosted && bg.imageUrl ? (
+      {dark && bg.imageUrl ? (
         <div
           aria-hidden
           className="absolute inset-0"
-          style={{ background: "linear-gradient(180deg, rgba(0,0,0,0.15), rgba(0,0,0,0.5))" }}
+          style={{ background: "linear-gradient(180deg, rgba(0,0,0,0.35), rgba(0,0,0,0.65))" }}
         />
       ) : null}
 
