@@ -14,6 +14,9 @@ export const metadata: Metadata = {
   description: "AktBot — منصة تسويق المبدعين في قطاع الجمال",
 };
 
+// سكربت وقائيّ: يطبّق الوضع الداكن (class) قبل الرسم — بلا وميض.
+const themeScript = `(function(){try{var t=localStorage.getItem('aktbot-theme');var d=t?t==='dark':window.matchMedia('(prefers-color-scheme: dark)').matches;if(d)document.documentElement.classList.add('dark');}catch(e){}})();`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -24,8 +27,12 @@ export default function RootLayout({
       lang="ar"
       dir="rtl"
       className={`${tajawal.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        {children}
+      </body>
     </html>
   );
 }

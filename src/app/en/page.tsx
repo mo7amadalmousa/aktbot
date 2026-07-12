@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { getMessages } from "@/lib/i18n";
 import { Landing } from "@/components/landing/landing";
 
-const locale = "ar" as const;
+const locale = "en" as const;
 
 export function generateMetadata(): Metadata {
   const m = getMessages(locale).landing.meta;
@@ -10,13 +10,13 @@ export function generateMetadata(): Metadata {
     title: m.title,
     description: m.description,
     alternates: {
-      canonical: "/",
+      canonical: "/en",
       languages: { ar: "/", en: "/en", tr: "/tr" },
     },
     openGraph: {
       title: m.title,
       description: m.description,
-      locale: "ar_AR",
+      locale: "en_US",
       type: "website",
     },
   };

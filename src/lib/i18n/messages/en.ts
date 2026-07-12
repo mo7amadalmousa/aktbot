@@ -1,0 +1,109 @@
+import type { Messages } from "../types";
+
+export const en: Messages = {
+  landing: {
+    meta: {
+      title: "AktBot — Inspiring Creativity & Influence",
+      description:
+        "AktBot: the one-page platform for beauty and medical creators — connect your audience, customize your page, and earn from consultations and campaigns.",
+      ogAlt: "AktBot — creator marketing platform",
+    },
+    nav: {
+      forCreators: "For Creators",
+      forBrands: "For Brands",
+      features: "Features",
+      how: "How it works",
+      login: "Log in",
+      cta: "Start free",
+      themeLight: "Light mode",
+      themeDark: "Dark mode",
+      language: "Language",
+    },
+    hero: {
+      eyebrow: "The platform for beauty & medical creators",
+      title: "One page for all your links and income",
+      subtitle:
+        "Connect your audience to everything you offer — links, gallery, paid consultations, and brand campaigns — from one elegant page that carries your identity.",
+      ctaCreator: "Start your free page",
+      ctaBrand: "Launch a campaign",
+      mockup: {
+        name: "Lina • Beauty Expert",
+        bio: "Skincare specialist · daily tips & routines",
+        followers: "128.5K followers",
+        link1: "Book a consultation",
+        link1sub: "Reply within 24h",
+        link2: "My curated shop",
+        offerTitle: "Private skin consultation",
+        offerDesc: "30-min online session",
+      },
+    },
+    creators: {
+      badge: "For Creators",
+      title: "All your tools in one place",
+      subtitle: "From the first link to the first income — no scattered tools.",
+      items: [
+        { title: "Link-in-bio page", desc: "All your links and content in one elegant link you share everywhere." },
+        { title: "Vibrant themes", desc: "Five fully customizable themes that reflect your identity and color." },
+        { title: "Paid consultations", desc: "Offer your sessions and paid content straight from your page (soon)." },
+        { title: "Campaign income", desc: "Connect with brands and turn your influence into steady income." },
+      ],
+    },
+    brands: {
+      badge: "For Brands",
+      title: "Precise reach to beauty & medical creators",
+      subtitle: "Targeted, measurable, and compliant campaigns.",
+      items: [
+        { title: "Specialized creators", desc: "A network of creators in beauty, skincare, and aesthetic medicine." },
+        { title: "Measurable campaigns", desc: "Track performance and reach with data-driven decisions." },
+        { title: "Medical compliance", desc: "A structure that respects medical content and disclosure requirements." },
+        { title: "Simplified management", desc: "From selection to reporting — clear steps, no complexity." },
+      ],
+    },
+    features: {
+      title: "Everything you need to grow",
+      subtitle: "Tools built for beauty and medical creators.",
+      items: [
+        { title: "Full customization", desc: "Colors, backgrounds, themes, and blocks — your page as you imagine it." },
+        { title: "Medical compliance", desc: "Ready for medical content and disclosure requirements." },
+        { title: "Paid consultations", desc: "Sell your sessions and content directly (soon)." },
+        { title: "Analytics", desc: "Understand your audience and link performance (soon)." },
+        { title: "Vibrant themes", desc: "Modern designs applied instantly with a live preview." },
+        { title: "Fast & secure", desc: "Fast pages, sanitized links, and data protection." },
+      ],
+    },
+    how: {
+      title: "Three steps to launch",
+      subtitle: "From sign-up to your first visitor in minutes.",
+      steps: [
+        { title: "Sign up free", desc: "Create your account and claim your page name in a minute." },
+        { title: "Build your page", desc: "Add links and blocks and pick your theme with a live preview." },
+        { title: "Publish & earn", desc: "Share your link, grow your audience, and start earning." },
+      ],
+    },
+    stats: {
+      disclaimer: "Illustrative numbers for display only — replaced with real data at launch.",
+      items: [
+        { value: "5+", label: "Customizable themes" },
+        { value: "3", label: "Supported languages" },
+        { value: "∞", label: "Links & blocks" },
+      ],
+    },
+    finalCta: {
+      title: "Ready to launch your page?",
+      subtitle: "Start free today — no card, no hassle.",
+      ctaCreator: "Start your free page",
+      ctaBrand: "Talk to us as a brand",
+    },
+    footer: {
+      tagline: "AktBot — Inspiring Creativity & Influence.",
+      productTitle: "Product",
+      product: ["For Creators", "For Brands", "Features", "How it works"],
+      companyTitle: "Company",
+      company: ["About", "Blog", "Contact"],
+      legalTitle: "Legal",
+      legal: ["Privacy", "Terms", "Cookies"],
+      rights: "© 2026 AktBot. All rights reserved.",
+      placeholderNote: "Some links are placeholders until launch.",
+    },
+  },
+};
