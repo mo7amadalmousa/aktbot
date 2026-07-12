@@ -96,7 +96,9 @@ export default async function PublicPage({
             </p>
           ) : (
             blocks.map((block) => (
-              <div key={block.id}>{renderBlock(block, frosted)}</div>
+              <div key={block.id}>
+                {renderBlock(block, frosted, { interactive: true })}
+              </div>
             ))
           )}
         </div>

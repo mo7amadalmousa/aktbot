@@ -22,8 +22,8 @@ export const BLOCK_META: Record<
   EMBED: { label: "فيديو / تضمين", hint: "YouTube · TikTok · Reels · Vimeo", addable: true },
   GALLERY: { label: "معرض صور", hint: "شبكة صور (قبل/بعد)", addable: true },
   FORM: { label: "نموذج تواصل", hint: "حقول تواصل", addable: true },
-  CONSULTATION: { label: "استشارة", hint: "بطاقة + سعر (يحتاج الدفع)", addable: false },
-  PAID_VIDEO: { label: "فيديو مدفوع", hint: "بطاقة + سعر (يحتاج الدفع)", addable: false },
+  CONSULTATION: { label: "استشارة مدفوعة", hint: "حجز جلسة بسعر", addable: true },
+  PAID_VIDEO: { label: "فيديو خاص مدفوع", hint: "طلب فيديو بسعر", addable: true },
   STORE: { label: "متجر", hint: "قريباً", addable: false },
   NEWSLETTER: { label: "نشرة بريدية", hint: "قريباً", addable: false },
   QR: { label: "رمز QR", hint: "قريباً", addable: false },
@@ -46,6 +46,21 @@ export function defaultBlockConfig(type: string): Record<string, unknown> {
           { label: "الاسم", type: "text", placeholder: "" },
           { label: "البريد الإلكتروني", type: "email", placeholder: "" },
         ],
+      };
+    case "CONSULTATION":
+      return {
+        title: "استشارة خاصّة",
+        description: "",
+        duration: "٣٠ دقيقة",
+        price: 50,
+        currency: "USD",
+      };
+    case "PAID_VIDEO":
+      return {
+        title: "فيديو خاص",
+        description: "",
+        price: 30,
+        currency: "USD",
       };
     default:
       return { title: "" };

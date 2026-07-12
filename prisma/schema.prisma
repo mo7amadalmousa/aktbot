@@ -95,8 +95,9 @@ model CreatorProfile {
   socialLinks   Json? // { instagram, tiktok, youtube, x, website, ... } — تُنقّى عند الإدخال لاحقاً
   createdAt   DateTime @default(now())
 
-  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  page Page?
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  page   Page?
+  orders Order[]
 }
 
 model Page {
@@ -122,4 +123,35 @@ model Block {
   page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
 
   @@index([pageId])
+}
+
+// ── الطلبات/المدفوعات (طبقة دفع محايدة) ──────────────────────────────
+enum OrderStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+  CANCELLED
+}
+
+model Order {
+  id               String      @id @default(cuid())
+  creatorProfileId String
+  buyerName        String
+  buyerEmail       String
+  blockType        BlockType // CONSULTATION | PAID_VIDEO
+  blockId          String
+  amount           Int // أصغر وحدة (minor units) — لتفادي أخطاء العشرية
+  currency         String
+  status           OrderStatus @default(PENDING)
+  provider         String      @default("mock")
+  providerRef      String?     @unique // مرجع المزوّد — يضمن idempotency للـwebhook
+  metadata         Json? // تفاصيل الاستشارة/الفيديو + تعليمات المشتري
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  creatorProfile CreatorProfile @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
+
+  @@index([creatorProfileId])
+  @@index([status])
 }

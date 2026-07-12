@@ -2,6 +2,7 @@ import { safeHref, parseEmbed } from "@/lib/public/safe-url";
 import { SAFE_CSS_COLOR, SAFE_CSS_GRADIENT } from "@/lib/public/background";
 import { asRecord, str, num, arr } from "@/lib/public/block-config";
 import { resolveThemeId } from "@/lib/public/themes";
+import { isSupportedCurrency } from "@/lib/payments/money";
 import {
   normalizeUsername,
   validateUsername,
@@ -118,12 +119,21 @@ function sanitizeBlockConfig(type: string, config: unknown): unknown {
     case "CONSULTATION":
     case "PAID_VIDEO": {
       const price = num(c.price);
+      if (price === null || price <= 0) {
+        throw new SanitizeError("السعر يجب أن يكون رقماً أكبر من صفر.");
+      }
+      const currency = str(c.currency) || "USD";
+      if (!isSupportedCurrency(currency)) {
+        throw new SanitizeError("عملة غير مدعومة (USD أو TRY).");
+      }
       const thumb = webUrl(c.thumbnailUrl);
       return {
-        title: str(c.title).slice(0, 120),
+        title:
+          str(c.title).slice(0, 120) ||
+          (type === "CONSULTATION" ? "استشارة" : "فيديو خاص"),
         description: str(c.description).slice(0, 400),
-        ...(price !== null ? { price } : {}),
-        currency: str(c.currency).slice(0, 8) || "USD",
+        price,
+        currency,
         duration: str(c.duration).slice(0, 60),
         ...(thumb ? { thumbnailUrl: thumb } : {}),
       };

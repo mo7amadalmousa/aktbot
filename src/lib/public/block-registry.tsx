@@ -11,7 +11,13 @@ import { ComingSoonBlock } from "@/components/public/blocks/coming-soon-block";
 // إضافة نوع لاحقاً = تسجيل مُصيِّر هنا، بلا لمس الصفحة. الأنواع غير المسجّلة
 // تسقط تلقائياً إلى ComingSoonBlock (عرض أساسيّ «قريباً») فلا تكسر الصفحة.
 
-type RenderArgs = { config: unknown; frosted: boolean; type: BlockType };
+type RenderArgs = {
+  config: unknown;
+  frosted: boolean;
+  type: BlockType;
+  blockId: string;
+  interactive: boolean;
+};
 type BlockRenderer = (args: RenderArgs) => ReactNode;
 
 export const blockRegistry: Partial<Record<BlockType, BlockRenderer>> = {
@@ -22,12 +28,24 @@ export const blockRegistry: Partial<Record<BlockType, BlockRenderer>> = {
     <GalleryBlock config={config} frosted={frosted} />
   ),
   FORM: ({ config, frosted }) => <FormBlock config={config} frosted={frosted} />,
-  // عرض بطاقة + سعر فقط (لا دفع الآن)
-  CONSULTATION: ({ config, frosted }) => (
-    <OfferBlock config={config} kind="consultation" frosted={frosted} />
+  // بلوكات مدفوعة — زرّ شراء فعّال على الصفحة العامّة (interactive)
+  CONSULTATION: ({ config, frosted, blockId, interactive }) => (
+    <OfferBlock
+      config={config}
+      kind="consultation"
+      frosted={frosted}
+      blockId={blockId}
+      interactive={interactive}
+    />
   ),
-  PAID_VIDEO: ({ config, frosted }) => (
-    <OfferBlock config={config} kind="paid_video" frosted={frosted} />
+  PAID_VIDEO: ({ config, frosted, blockId, interactive }) => (
+    <OfferBlock
+      config={config}
+      kind="paid_video"
+      frosted={frosted}
+      blockId={blockId}
+      interactive={interactive}
+    />
   ),
   // STORE / NEWSLETTER / QR غير مسجّلة عمداً → ComingSoonBlock (موجات لاحقة).
 };
@@ -38,10 +56,20 @@ export interface PublicBlock {
   config: unknown;
 }
 
-export function renderBlock(block: PublicBlock, frosted: boolean): ReactNode {
+export function renderBlock(
+  block: PublicBlock,
+  frosted: boolean,
+  opts?: { interactive?: boolean },
+): ReactNode {
   const renderer = blockRegistry[block.type];
   if (renderer) {
-    return renderer({ config: block.config, frosted, type: block.type });
+    return renderer({
+      config: block.config,
+      frosted,
+      type: block.type,
+      blockId: block.id,
+      interactive: opts?.interactive ?? false,
+    });
   }
   return (
     <ComingSoonBlock config={block.config} type={block.type} frosted={frosted} />
