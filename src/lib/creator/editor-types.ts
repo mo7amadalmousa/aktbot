@@ -13,6 +13,7 @@ export const ALL_BLOCK_TYPES = [
   "QR",
   "BEFORE_AFTER",
   "STORY",
+  "SOCIAL",
 ] as const;
 
 // وصف كل نوع للمحرّر. addable=false → «قريباً» (لا يُضاف؛ الموجود يُرتَّب/يُخفى/يُحذف).
@@ -31,6 +32,7 @@ export const BLOCK_META: Record<
   QR: { label: "رمز QR", hint: "رمز صفحتك للمشاركة", addable: true },
   BEFORE_AFTER: { label: "قبل / بعد", hint: "سلايدر مقارنة صورتين", addable: true },
   STORY: { label: "ستوري", hint: "نشر مؤقّت (24 ساعة أو مشاهدة واحدة)", addable: true },
+  SOCIAL: { label: "تواصل اجتماعي", hint: "أيقونات روابط منصّاتك", addable: true },
 };
 
 // config افتراضيّ عند إضافة بلوك جديد.
@@ -91,6 +93,8 @@ export function defaultBlockConfig(type: string): Record<string, unknown> {
       };
     case "QR":
       return { title: "رمز صفحتي" };
+    case "SOCIAL":
+      return { links: [{ platform: "instagram", url: "" }] };
     default:
       return { title: "" };
   }

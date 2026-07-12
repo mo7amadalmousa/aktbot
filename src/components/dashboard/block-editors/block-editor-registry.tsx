@@ -11,6 +11,7 @@ import { StoryEditor } from "./story-editor";
 import { StoreEditor } from "./store-editor";
 import { NewsletterEditor } from "./newsletter-editor";
 import { QrEditor } from "./qr-editor";
+import { SocialEditor } from "./social-editor";
 import { ComingSoonEditor } from "./coming-soon-editor";
 
 // ── سجلّ محرّرات البلوكات (موازٍ لـ block-registry في العرض) ───────────
@@ -33,6 +34,7 @@ const EDITORS: Record<string, (p: EditorProps) => ReactNode> = {
   STORE: StoreEditor,
   NEWSLETTER: NewsletterEditor,
   QR: QrEditor,
+  SOCIAL: SocialEditor,
 };
 
 export function renderBlockEditor(

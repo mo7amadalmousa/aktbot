@@ -198,6 +198,18 @@ async function main() {
           ],
         },
       },
+      {
+        type: "SOCIAL",
+        order: 8,
+        config: {
+          links: [
+            { platform: "instagram", url: "https://instagram.com/lina.beauty" },
+            { platform: "tiktok", url: "https://www.tiktok.com/@lina.beauty" },
+            { platform: "youtube", url: "https://youtube.com/@lina.beauty" },
+            { platform: "whatsapp", url: "https://wa.me/905000000000" },
+          ],
+        },
+      },
     ],
   });
 

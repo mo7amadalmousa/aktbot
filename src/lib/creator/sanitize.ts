@@ -2,6 +2,7 @@ import { safeHref, parseEmbed } from "@/lib/public/safe-url";
 import { SAFE_CSS_COLOR, SAFE_CSS_GRADIENT } from "@/lib/public/background";
 import { asRecord, str, num, arr } from "@/lib/public/block-config";
 import { resolveThemeId } from "@/lib/public/themes";
+import { isKnownPlatform } from "@/lib/public/social-platforms";
 import { isSupportedCurrency } from "@/lib/payments/money";
 import { isManagedMediaUrl } from "@/lib/storage";
 import {
@@ -208,6 +209,19 @@ function sanitizeBlockConfig(type: string, config: unknown): unknown {
     case "QR": {
       // لا إدخال حرّ — الرمز يُولَّد لرابط الصفحة من username خادميّاً.
       return { title: str(c.title).slice(0, 120) };
+    }
+    case "SOCIAL": {
+      const links = arr(c.links)
+        .map((l) => {
+          const r = asRecord(l);
+          const url = webUrl(r.url); // http(s) فقط؛ رابط خبيث → يُسقَط
+          if (!url) return null;
+          const p = str(r.platform);
+          return { platform: isKnownPlatform(p) ? p : "website", url };
+        })
+        .filter((x): x is { platform: string; url: string } => x !== null)
+        .slice(0, 20);
+      return { links };
     }
     default: {
       return {

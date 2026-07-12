@@ -10,6 +10,7 @@ import { StoryBlock } from "@/components/public/blocks/story-block";
 import { StoreBlock } from "@/components/public/blocks/store-block";
 import { NewsletterBlock } from "@/components/public/blocks/newsletter-block";
 import { QrBlock } from "@/components/public/blocks/qr-block";
+import { SocialBlock } from "@/components/public/blocks/social-block";
 import { ComingSoonBlock } from "@/components/public/blocks/coming-soon-block";
 
 // ── سجلّ البلوكات: type → مكوّن عرض ───────────────────────────────────
@@ -67,6 +68,7 @@ export const blockRegistry: Partial<Record<BlockType, BlockRenderer>> = {
   QR: ({ config, frosted, username }) => (
     <QrBlock config={config} username={username} frosted={frosted} />
   ),
+  SOCIAL: ({ config }) => <SocialBlock config={config} />,
   // كل الأنواع مسجّلة الآن — لا نوع «قريباً».
 };
 
