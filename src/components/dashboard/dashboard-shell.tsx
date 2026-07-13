@@ -1,11 +1,25 @@
 import Link from "next/link";
-import { LayoutGrid, ShoppingBag, Package, Mail, Tag, BarChart3 } from "lucide-react";
+import {
+  LayoutGrid,
+  ShoppingBag,
+  Package,
+  CalendarClock,
+  Mail,
+  Tag,
+  BarChart3,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // هيكل الداشبورد المشترك (سايدبار + شريط جوّال) — يعاد استخدامه في المحرّر والطلبات.
 const NAV_SOON = [{ label: "التحليلات", Icon: BarChart3 }];
 
-type NavKey = "page" | "products" | "orders" | "subscribers" | "coupons";
+type NavKey =
+  | "page"
+  | "products"
+  | "bookings"
+  | "orders"
+  | "subscribers"
+  | "coupons";
 
 export function DashboardShell({
   active,
@@ -47,6 +61,7 @@ export function DashboardShell({
         <nav className="flex-1 space-y-1 px-3 py-2">
           {navItem("page", "/dashboard", "صفحتي", LayoutGrid)}
           {navItem("products", "/dashboard/products", "المنتجات", Package)}
+          {navItem("bookings", "/dashboard/bookings", "المواعيد", CalendarClock)}
           {navItem("orders", "/dashboard/orders", "الطلبات", ShoppingBag)}
           {navItem("subscribers", "/dashboard/subscribers", "المشتركون", Mail)}
           {navItem("coupons", "/dashboard/coupons", "الخصومات", Tag)}

@@ -132,7 +132,34 @@ function sanitizeBlockConfig(type: string, config: unknown): unknown {
         fields,
       };
     }
-    case "CONSULTATION":
+    case "CONSULTATION": {
+      // حجز موعد: مجانيّ أو مدفوع (المبدع يحدّد). السعر من القاعدة للمدفوع.
+      const mode = str(c.mode) === "PAID" ? "PAID" : "FREE";
+      const currency = str(c.currency) || "USD";
+      const price = num(c.price);
+      if (mode === "PAID") {
+        if (price === null || price <= 0) {
+          throw new SanitizeError("سعر الاستشارة المدفوعة يجب أن يكون أكبر من صفر.");
+        }
+        if (!isSupportedCurrency(currency)) {
+          throw new SanitizeError("عملة غير مدعومة (USD أو TRY).");
+        }
+      }
+      const meetingType = str(c.meetingType) === "in_person" ? "in_person" : "online";
+      const thumb = imageUrl(c.thumbnailUrl);
+      const meetingLink = meetingType === "online" ? webUrl(c.meetingLink) : null;
+      return {
+        mode,
+        title: str(c.title).slice(0, 120) || "استشارة",
+        description: str(c.description).slice(0, 400),
+        ...(mode === "PAID" ? { price: price ?? 0, currency } : {}),
+        duration: str(c.duration).slice(0, 60),
+        meetingType,
+        instructions: str(c.instructions).slice(0, 600),
+        ...(meetingLink ? { meetingLink } : {}),
+        ...(thumb ? { thumbnailUrl: thumb } : {}),
+      };
+    }
     case "PAID_VIDEO": {
       const price = num(c.price);
       if (price === null || price <= 0) {
@@ -144,9 +171,7 @@ function sanitizeBlockConfig(type: string, config: unknown): unknown {
       }
       const thumb = imageUrl(c.thumbnailUrl);
       return {
-        title:
-          str(c.title).slice(0, 120) ||
-          (type === "CONSULTATION" ? "استشارة" : "فيديو خاص"),
+        title: str(c.title).slice(0, 120) || "فيديو خاص",
         description: str(c.description).slice(0, 400),
         price,
         currency,

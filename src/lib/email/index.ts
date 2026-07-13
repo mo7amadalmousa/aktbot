@@ -1,5 +1,6 @@
 import type { EmailAdapter } from "./types";
 import { mockEmailAdapter } from "./mock-adapter";
+import { formatFullInTz } from "@/lib/booking/time";
 
 // بريد ترانزاكشنال يُرسَل من aktbot.com.
 const FROM = "no-reply@aktbot.com";
@@ -396,4 +397,132 @@ ${data.trackingNumber ? `<p>رقم التتبّع: <strong>${data.trackingNumber
 <p><a href="${track}">تفاصيل الطلب</a></p>
 <p style="color:#666">— ${FROM}</p>`,
   });
+}
+
+// ── حجز المواعيد (تأكيد/إلغاء) ────────────────────────────────────────
+interface BookingEmailData {
+  bookingId: string;
+  buyerName: string;
+  buyerEmail: string;
+  creatorName: string;
+  startISO: string;
+  endISO: string;
+  timezone: string;
+  isPaid: boolean;
+  meetingType: string; // online | in_person
+  meetingLink: string | null;
+}
+
+function bookingLinks(data: { bookingId: string; buyerEmail: string }) {
+  const e = encodeURIComponent(data.buyerEmail);
+  return {
+    view: `${appUrl()}/booking/${data.bookingId}?e=${e}`,
+    ics: `${appUrl()}/api/bookings/${data.bookingId}/ics?e=${e}`,
+  };
+}
+
+export async function sendBookingConfirmationBuyer(
+  data: BookingEmailData,
+): Promise<void> {
+  const when = formatFullInTz(data.startISO, data.timezone);
+  const { view, ics } = bookingLinks(data);
+  const meetLine =
+    data.meetingType === "online"
+      ? data.meetingLink
+        ? `رابط اللقاء: ${data.meetingLink}`
+        : "لقاء أونلاين — سيصلك الرابط قبل الموعد."
+      : "لقاء حضوريّ — سيتواصل معك المبدع بالتفاصيل.";
+  await getEmailAdapter().send({
+    to: data.buyerEmail,
+    subject: `AktBot — تأكيد موعدك مع ${data.creatorName}`,
+    text: [
+      `مرحباً ${data.buyerName}،`,
+      "",
+      `تأكّد حجز موعدك مع ${data.creatorName}.`,
+      `الموعد: ${when}`,
+      meetLine,
+      data.isPaid ? "الحالة: مدفوع." : "الحالة: مجانيّ.",
+      "",
+      `التفاصيل: ${view}`,
+      `أضِفه لتقويمك (ICS): ${ics}`,
+      `— ${FROM}`,
+    ].join("\n"),
+    html: `<p>مرحباً ${data.buyerName}،</p>
+<p>تأكّد حجز موعدك مع <strong>${data.creatorName}</strong>.</p>
+<p>الموعد: <strong>${when}</strong><br/>${meetLine}<br/>${data.isPaid ? "الحالة: مدفوع." : "الحالة: مجانيّ."}</p>
+<p><a href="${view}">تفاصيل الموعد</a> · <a href="${ics}">أضِفه لتقويمك (ICS)</a></p>
+<p style="color:#666">— ${FROM}</p>`,
+  });
+}
+
+export async function sendBookingConfirmationCreator(
+  creatorEmail: string,
+  data: BookingEmailData,
+): Promise<void> {
+  const when = formatFullInTz(data.startISO, data.timezone);
+  await getEmailAdapter().send({
+    to: creatorEmail,
+    subject: `AktBot — موعد جديد: ${data.buyerName}`,
+    text: [
+      `مرحباً ${data.creatorName}،`,
+      "",
+      `لديك موعد جديد مؤكّد.`,
+      `العميل: ${data.buyerName} <${data.buyerEmail}>`,
+      `الموعد: ${when}`,
+      data.meetingType === "online" ? "النوع: أونلاين" : "النوع: حضوريّ",
+      data.isPaid ? "مدفوع." : "مجانيّ.",
+      "",
+      "راجع مواعيدك من لوحة التحكّم.",
+      `— ${FROM}`,
+    ].join("\n"),
+    html: `<p>مرحباً ${data.creatorName}،</p>
+<p>لديك موعد جديد مؤكّد.</p>
+<p>العميل: ${data.buyerName} &lt;${data.buyerEmail}&gt;<br/>الموعد: <strong>${when}</strong><br/>${data.meetingType === "online" ? "أونلاين" : "حضوريّ"} · ${data.isPaid ? "مدفوع" : "مجانيّ"}</p>
+<p style="color:#666">راجع مواعيدك من لوحة التحكّم.<br/>— ${FROM}</p>`,
+  });
+}
+
+interface BookingCancelData {
+  buyerName: string;
+  buyerEmail: string;
+  creatorName: string;
+  creatorEmail: string | null;
+  startISO: string;
+  timezone: string;
+  isPaid: boolean;
+}
+
+export async function sendBookingCancellation(
+  data: BookingCancelData,
+): Promise<void> {
+  const when = formatFullInTz(data.startISO, data.timezone);
+  const refundNote = data.isPaid
+    ? " إن كان مدفوعاً، سيتواصل معك المبدع بخصوص الاسترداد."
+    : "";
+  await getEmailAdapter().send({
+    to: data.buyerEmail,
+    subject: `AktBot — إلغاء موعدك مع ${data.creatorName}`,
+    text: [
+      `مرحباً ${data.buyerName}،`,
+      "",
+      `أُلغي موعدك (${when}) مع ${data.creatorName}.${refundNote}`,
+      `— ${FROM}`,
+    ].join("\n"),
+    html: `<p>مرحباً ${data.buyerName}،</p>
+<p>أُلغي موعدك (<strong>${when}</strong>) مع ${data.creatorName}.${refundNote}</p>
+<p style="color:#666">— ${FROM}</p>`,
+  });
+  if (data.creatorEmail) {
+    await getEmailAdapter().send({
+      to: data.creatorEmail,
+      subject: `AktBot — أُلغي موعد: ${data.buyerName}`,
+      text: [
+        `مرحباً ${data.creatorName}،`,
+        "",
+        `أُلغي موعد ${data.buyerName} (${when}). تحرّر الموعد.`,
+        `— ${FROM}`,
+      ].join("\n"),
+      html: `<p>مرحباً ${data.creatorName}،</p><p>أُلغي موعد ${data.buyerName} (<strong>${when}</strong>). تحرّر الموعد.</p><p style="color:#666">— ${FROM}</p>`,
+    });
+  }
 }

@@ -290,9 +290,24 @@ async function main() {
         config: {
           title: "استشارة بشرة خاصّة",
           description: "جلسة أونلاين لتحليل بشرتك ووضع روتين مخصّص",
+          mode: "PAID",
           price: 150,
           currency: "USD",
           duration: "٣٠ دقيقة",
+          meetingType: "online",
+          meetingLink: "https://meet.google.com/abc-defg-hij",
+          instructions: "أرسلي صورة واضحة لبشرتك قبل الجلسة إن أمكن.",
+        },
+      },
+      {
+        type: "CONSULTATION",
+        order: 11,
+        config: {
+          title: "مكالمة تعارف مجانيّة",
+          description: "١٥ دقيقة نتعرّف فيها على احتياج بشرتك — مجاناً",
+          mode: "FREE",
+          meetingType: "online",
+          instructions: "جهّزي أسئلتك.",
         },
       },
       {
@@ -450,6 +465,32 @@ async function main() {
   });
 
   const linaProduct = await seedLinaDigitalProduct(lina.profileId, lina.pageId);
+
+  // توفّر لينا للحجز: أحد–خميس 10:00–17:00 (إسطنبول)، جلسة 30د، أفق 21 يوماً.
+  const linaWeekly = [0, 1, 2, 3, 4].map((day) => ({
+    day,
+    ranges: [{ start: "10:00", end: "17:00" }],
+  }));
+  await prisma.availability.upsert({
+    where: { creatorProfileId: lina.profileId },
+    update: {
+      timezone: "Europe/Istanbul",
+      slotMinutes: 30,
+      bufferMinutes: 0,
+      horizonDays: 21,
+      weekly: linaWeekly,
+      exceptions: [],
+    },
+    create: {
+      creatorProfileId: lina.profileId,
+      timezone: "Europe/Istanbul",
+      slotMinutes: 30,
+      bufferMinutes: 0,
+      horizonDays: 21,
+      weekly: linaWeekly,
+      exceptions: [],
+    },
+  });
 
   console.log("✓ seeded:", lina, sara, linaProduct);
 }
