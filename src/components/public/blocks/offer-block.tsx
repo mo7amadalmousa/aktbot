@@ -29,8 +29,14 @@ export function OfferBlock({
   const thumb = safeCssUrl(c.thumbnailUrl);
   const priceLabel =
     price !== null && price > 0 ? formatMoney(toMinor(price, currency), currency) : null;
-  const ctaLabel = kind === "consultation" ? "احجز الآن" : "اطلب الآن";
-  const canBuy = Boolean(interactive && blockId && price !== null && price > 0);
+  const isConsultation = kind === "consultation";
+  const ctaLabel = isConsultation ? "احجز موعد" : "اطلب الآن";
+  // الاستشارة تفتح صفحة الحجز (مجانيّ أو مدفوع) — لا تشترط سعراً.
+  // الفيديو المدفوع يفتح الدفع مباشرةً (يشترط سعراً).
+  const canBuy = isConsultation
+    ? Boolean(interactive && blockId)
+    : Boolean(interactive && blockId && price !== null && price > 0);
+  const href = isConsultation ? `/book/${blockId}` : `/checkout/${blockId}`;
 
   const btnStyle = {
     background: "var(--pp-btn-bg)",
@@ -76,7 +82,7 @@ export function OfferBlock({
 
       {canBuy ? (
         <a
-          href={`/checkout/${blockId}`}
+          href={href}
           className="mt-3 block w-full border px-4 py-2.5 text-center text-sm font-semibold transition-transform hover:-translate-y-0.5"
           style={btnStyle}
         >

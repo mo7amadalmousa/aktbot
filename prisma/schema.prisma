@@ -114,9 +114,11 @@ model CreatorProfile {
 
   user        User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   page        Page?
-  orders      Order[]
-  subscribers NewsletterSubscriber[]
-  products    Product[]
+  orders       Order[]
+  subscribers  NewsletterSubscriber[]
+  products     Product[]
+  availability Availability?
+  bookings     Booking[]
 }
 
 // مشتركو النشرة البريديّة لكل مبدع (جمع فقط الآن؛ إرسال الحملات لاحقاً).
@@ -221,6 +223,7 @@ model Order {
   downloadTokens  DownloadToken[]
   enrollment      CourseEnrollment?
   shippingAddress ShippingAddress?
+  booking         Booking?
 
   @@index([creatorProfileId])
   @@index([status])
@@ -364,4 +367,58 @@ model ShippingAddress {
   createdAt  DateTime @default(now())
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+// ── حجز المواعيد (ترقية CONSULTATION) ─────────────────────────────────
+// توفّر المبدع: نمط أسبوعيّ مرن (JSON) + منطقة زمنية + مدّة/فاصل/أفق.
+// اخترتُ توفّراً واحداً لكل مبدع (creatorProfileId @unique) مع weekly JSON
+// (أبسط وأمرن من صفوف؛ الاستثناءات JSON اختياريّة).
+model Availability {
+  id               String   @id @default(cuid())
+  creatorProfileId String   @unique
+  timezone         String   @default("UTC") // IANA (مثل Europe/Istanbul)
+  slotMinutes      Int      @default(30) // مدّة الجلسة
+  bufferMinutes    Int      @default(0) // فاصل بين المواعيد
+  horizonDays      Int      @default(30) // أفق الحجز مقدّماً
+  weekly           Json? // [{ day:0-6, ranges:[{ start:"09:00", end:"17:00" }] }]
+  exceptions       Json? // ["2026-07-20", ...] أيام إجازة (تعطيل)
+  updatedAt        DateTime @updatedAt
+  createdAt        DateTime @default(now())
+
+  creatorProfile CreatorProfile @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
+}
+
+enum BookingStatus {
+  PENDING // مدفوع بانتظار الدفع (hold)
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+// حجز موعد. منع الازدواج الذرّيّ عبر slotKey فريد (يُضبط للمواعيد النشطة فقط،
+// ويُفرَّغ null عند الإلغاء/انتهاء الـhold فيتحرّر الموعد). المواعيد مولّدة بمحاذاة
+// slotMinutes فالتصادم = نفس startAt بالضبط.
+model Booking {
+  id                  String        @id @default(cuid())
+  creatorProfileId    String
+  consultationBlockId String
+  buyerName           String
+  buyerEmail          String
+  startAt             DateTime
+  endAt               DateTime
+  status              BookingStatus @default(PENDING)
+  isPaid              Boolean       @default(false)
+  orderId             String?       @unique
+  meetingLink         String?
+  meetingType         String        @default("online") // online | in_person
+  holdExpiresAt       DateTime? // للمدفوع PENDING — يُحرَّر بعدها
+  slotKey             String?       @unique // "<creatorProfileId>|<startISO>" للنشط، null للمحرَّر
+  createdAt           DateTime      @default(now())
+
+  creatorProfile CreatorProfile @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
+  order          Order?         @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([creatorProfileId])
+  @@index([consultationBlockId])
+  @@index([status])
 }

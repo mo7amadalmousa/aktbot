@@ -488,6 +488,17 @@ export async function processPaymentEvent(
     return { handled: true };
   }
 
+  // مسار حجز موعد مدفوع (بلوك استشارة): أكّد الحجز (بريد الطرفين) بدل البريد العامّ.
+  const booking = await prisma.booking.findUnique({
+    where: { orderId: order.id },
+    select: { id: true },
+  });
+  if (booking) {
+    const { confirmBookingByOrder } = await import("@/lib/booking/service");
+    await confirmBookingByOrder(order.id);
+    return { handled: true };
+  }
+
   // مسار البلوك المدفوع (استشارة/فيديو): بريد تأكيد + إشعار المبدع.
   const meta = asRecord(order.metadata);
   const emailData = {
