@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Pencil, Trash2, Loader2, Power, ArrowRight } from "lucide-react";
 import { Field, TextInput } from "@/components/dashboard/field";
+import { formatMoney, fromMinor, DEFAULT_CURRENCY } from "@/lib/payments/money";
 
 export interface RuleView {
   id: string;
@@ -69,8 +70,8 @@ const empty: FormState = {
 };
 
 function rateLabel(r: RuleView): string {
-  if (r.fixedAmount != null) return `$${(r.fixedAmount / 100).toFixed(2)} ثابت`;
-  if (r.percentBps != null) return `${(r.percentBps / 100).toFixed(2)}%`;
+  if (r.fixedAmount != null) return `${formatMoney(r.fixedAmount, DEFAULT_CURRENCY)} ثابت`;
+  if (r.percentBps != null) return `${(r.percentBps / 100).toFixed(2)}%`; // bps→% محايد للعملة
   return "—";
 }
 
@@ -100,7 +101,7 @@ export function CommissionRulesManager({ initial }: { initial: RuleView[] }) {
       targetId: r.targetId ?? "",
       rateKind: r.fixedAmount != null ? "fixed" : "percent",
       percent: r.percentBps != null ? String(r.percentBps / 100) : "",
-      fixedAmount: r.fixedAmount != null ? String(r.fixedAmount / 100) : "",
+      fixedAmount: r.fixedAmount != null ? String(fromMinor(r.fixedAmount, DEFAULT_CURRENCY)) : "",
       priority: String(r.priority),
       startAt: r.startAt ? r.startAt.slice(0, 10) : "",
       endAt: r.endAt ? r.endAt.slice(0, 10) : "",
@@ -149,7 +150,7 @@ export function CommissionRulesManager({ initial }: { initial: RuleView[] }) {
         saleType: r.saleType || undefined,
         targetId: r.targetId || undefined,
         percent: r.percentBps != null ? r.percentBps / 100 : undefined,
-        fixedAmount: r.fixedAmount != null ? r.fixedAmount / 100 : undefined,
+        fixedAmount: r.fixedAmount != null ? fromMinor(r.fixedAmount, DEFAULT_CURRENCY) : undefined,
         priority: r.priority,
         startAt: r.startAt || undefined,
         endAt: r.endAt || undefined,

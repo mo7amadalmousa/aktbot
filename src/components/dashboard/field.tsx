@@ -35,12 +35,14 @@ export function TextInput({
   placeholder,
   type = "text",
   disabled,
+  step,
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
   type?: string;
   disabled?: boolean;
+  step?: string; // لحقول المبالغ — خطوة حسب منازل العملة
 }) {
   return (
     <input
@@ -48,6 +50,7 @@ export function TextInput({
       value={value}
       disabled={disabled}
       placeholder={placeholder}
+      step={step}
       onChange={(e) => onChange(e.target.value)}
       className={inputCls}
       dir="auto"

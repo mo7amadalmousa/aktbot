@@ -66,7 +66,16 @@ export default async function AdminPage() {
           <StatCard label="المبدعون" value={fmtNum(a.creators)} sub={`${fmtNum(a.published)} صفحة منشورة`} icon={<Users className="size-4" />} accent />
           <StatCard label="إجمالي الزوّار" value={fmtNum(a.totalViews)} sub={`${fmtNum(a.totalUniques)} فريد`} icon={<Eye className="size-4" />} />
           <StatCard label="الطلبات" value={fmtNum(a.orders)} sub={`${fmtNum(a.paidOrders)} مدفوعة`} icon={<ShoppingBag className="size-4" />} />
-          <StatCard label="المبيعات (mock)" value={formatMoney(a.salesMinor, "USD")} sub="طبقة دفع تجريبيّة" icon={<DollarSign className="size-4" />} />
+          <StatCard
+            label="المبيعات (mock)"
+            value={
+              a.salesByCurrency.length === 0
+                ? "—"
+                : a.salesByCurrency.map((s) => formatMoney(s.sum, s.currency)).join(" · ")
+            }
+            sub="مجمّعة حسب العملة"
+            icon={<DollarSign className="size-4" />}
+          />
           <StatCard label="الصفحات المنشورة" value={fmtNum(a.published)} icon={<Globe className="size-4" />} />
           <StatCard label="الحجوزات" value={fmtNum(a.bookings)} sub={`${fmtNum(a.confirmedBookings)} مؤكّدة`} icon={<CalendarClock className="size-4" />} />
         </div>

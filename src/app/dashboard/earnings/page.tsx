@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
-import { StatCard, fmtNum } from "@/components/dashboard/analytics-bits";
+import { StatCard } from "@/components/dashboard/analytics-bits";
 import { getCreatorEarnings } from "@/lib/commission/query";
 import { formatMoney } from "@/lib/payments/money";
 import { Wallet, Receipt, Scissors } from "lucide-react";
@@ -27,40 +27,53 @@ export default async function EarningsPage() {
   if (!profile) redirect("/dashboard");
 
   const e = await getCreatorEarnings(profile.id);
-  const cur = e.currency;
 
   return (
     <DashboardShell active="earnings" email={session.email}>
       <div className="flex flex-1 flex-col p-5">
         <h1 className="mb-4 text-lg font-bold text-foreground">أرباحي</h1>
 
-        <div className="mb-5 grid gap-3 sm:grid-cols-3">
-          <StatCard label="إجمالي المبيعات" value={formatMoney(e.totalGross, cur)} icon={<Receipt className="size-4" />} />
-          <StatCard label="عمولة المنصّة" value={formatMoney(e.totalCommission, cur)} icon={<Scissors className="size-4" />} />
-          <StatCard label="صافي أرباحي" value={formatMoney(e.totalNet, cur)} sub="مستحقّة (تُسوَّى لاحقاً)" icon={<Wallet className="size-4" />} accent />
-        </div>
-
-        {/* حسب المصدر */}
-        {e.bySource.length > 0 ? (
-          <div className="mb-5 rounded-2xl border border-border bg-card p-4">
-            <p className="mb-3 text-sm font-semibold text-foreground">حسب المصدر</p>
-            <div className="space-y-2">
-              {e.bySource.map((s) => (
-                <div key={s.saleType} className="flex items-center justify-between text-sm">
-                  <span className="text-foreground">
-                    {s.label} <span className="text-xs text-muted-foreground">({s.count})</span>
-                  </span>
-                  <span className="text-muted-foreground">
-                    مبيعات {formatMoney(s.gross, cur)} · صافٍ{" "}
-                    <span className="font-medium text-foreground">{formatMoney(s.net, cur)}</span>
-                  </span>
-                </div>
-              ))}
-            </div>
+        {e.byCurrency.length === 0 ? (
+          <div className="mb-5 rounded-2xl border border-dashed border-border py-10 text-center text-sm text-muted-foreground">
+            لا مبيعات مؤكّدة بعد.
           </div>
-        ) : null}
+        ) : (
+          // 🔴 مجمّعة حسب العملة — لا خلط عملات في رقم واحد.
+          e.byCurrency.map((g) => (
+            <div key={g.currency} className="mb-5">
+              {e.byCurrency.length > 1 ? (
+                <p className="mb-2 text-sm font-semibold text-foreground">
+                  عملة {g.currency}
+                </p>
+              ) : null}
+              <div className="grid gap-3 sm:grid-cols-3">
+                <StatCard label="إجمالي المبيعات" value={formatMoney(g.gross, g.currency)} icon={<Receipt className="size-4" />} />
+                <StatCard label="عمولة المنصّة" value={formatMoney(g.commission, g.currency)} icon={<Scissors className="size-4" />} />
+                <StatCard label="صافي أرباحي" value={formatMoney(g.net, g.currency)} sub="مستحقّة (تُسوَّى لاحقاً)" icon={<Wallet className="size-4" />} accent />
+              </div>
+              {g.bySource.length > 0 ? (
+                <div className="mt-3 rounded-2xl border border-border bg-card p-4">
+                  <p className="mb-2 text-sm font-semibold text-foreground">حسب المصدر ({g.currency})</p>
+                  <div className="space-y-2">
+                    {g.bySource.map((s) => (
+                      <div key={s.saleType} className="flex items-center justify-between text-sm">
+                        <span className="text-foreground">
+                          {s.label} <span className="text-xs text-muted-foreground">({s.count})</span>
+                        </span>
+                        <span className="text-muted-foreground">
+                          مبيعات {formatMoney(s.gross, g.currency)} · صافٍ{" "}
+                          <span className="font-medium text-foreground">{formatMoney(s.net, g.currency)}</span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ))
+        )}
 
-        {/* سجلّ المعاملات */}
+        {/* سجلّ المعاملات (كل صفّ بعملته) */}
         <div className="rounded-2xl border border-border">
           <div className="border-b border-border p-3">
             <p className="text-sm font-semibold text-foreground">سجلّ المعاملات</p>

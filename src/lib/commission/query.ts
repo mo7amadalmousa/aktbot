@@ -31,6 +31,16 @@ export interface SourceRow {
   count: number;
 }
 
+// 🔴 مجموعة لكل عملة — لا تُجمع عملات مختلفة (معاملاتها تختلف) في رقم واحد.
+export interface CurrencyGroup {
+  currency: string;
+  gross: number;
+  commission: number;
+  net: number;
+  count: number;
+  bySource: SourceRow[];
+}
+
 export interface LedgerRow {
   id: string;
   saleType: string;
@@ -45,39 +55,63 @@ export interface LedgerRow {
 }
 
 export interface CreatorEarnings {
-  totalGross: number;
-  totalCommission: number;
-  totalNet: number;
-  currency: string;
-  bySource: SourceRow[];
+  byCurrency: CurrencyGroup[];
   ledger: LedgerRow[];
 }
 
-// أرباح مبدع — من سجلّ العمولة (مصدر الحقيقة، لا حساب مكرّر).
+// يبني مجموعات حسب [العملة] من groupBy([currency, saleType]).
+function buildCurrencyGroups(
+  rows: {
+    currency: string;
+    saleType: string;
+    _sum: { grossAmount: number | null; commissionAmount: number | null; netCreatorAmount: number | null };
+    _count: { _all: number };
+  }[],
+): CurrencyGroup[] {
+  const byCur = new Map<string, CurrencyGroup>();
+  for (const r of rows) {
+    if (!byCur.has(r.currency)) {
+      byCur.set(r.currency, {
+        currency: r.currency,
+        gross: 0,
+        commission: 0,
+        net: 0,
+        count: 0,
+        bySource: [],
+      });
+    }
+    const g = byCur.get(r.currency)!;
+    const gross = r._sum.grossAmount ?? 0;
+    const commission = r._sum.commissionAmount ?? 0;
+    const net = r._sum.netCreatorAmount ?? 0;
+    g.gross += gross;
+    g.commission += commission;
+    g.net += net;
+    g.count += r._count._all;
+    g.bySource.push({
+      saleType: r.saleType,
+      label: SALE_TYPE_LABEL[r.saleType] ?? r.saleType,
+      gross,
+      commission,
+      net,
+      count: r._count._all,
+    });
+  }
+  for (const g of byCur.values()) g.bySource.sort((a, b) => b.gross - a.gross);
+  return [...byCur.values()].sort((a, b) => b.gross - a.gross);
+}
+
+// أرباح مبدع — من سجلّ العمولة (مصدر الحقيقة، مجمّعة حسب العملة).
 export async function getCreatorEarnings(
   creatorProfileId: string,
 ): Promise<CreatorEarnings> {
   const grouped = await prisma.commissionLedger.groupBy({
-    by: ["saleType"],
+    by: ["currency", "saleType"],
     where: { creatorProfileId, status: { in: EARNING_STATUSES } },
     _sum: { grossAmount: true, commissionAmount: true, netCreatorAmount: true },
     _count: { _all: true },
   });
-
-  const bySource: SourceRow[] = grouped
-    .map((g) => ({
-      saleType: g.saleType,
-      label: SALE_TYPE_LABEL[g.saleType] ?? g.saleType,
-      gross: g._sum.grossAmount ?? 0,
-      commission: g._sum.commissionAmount ?? 0,
-      net: g._sum.netCreatorAmount ?? 0,
-      count: g._count._all,
-    }))
-    .sort((a, b) => b.gross - a.gross);
-
-  const totalGross = bySource.reduce((s, r) => s + r.gross, 0);
-  const totalCommission = bySource.reduce((s, r) => s + r.commission, 0);
-  const totalNet = bySource.reduce((s, r) => s + r.net, 0);
+  const byCurrency = buildCurrencyGroups(grouped);
 
   const rows = await prisma.commissionLedger.findMany({
     where: { creatorProfileId },
@@ -97,54 +131,39 @@ export async function getCreatorEarnings(
     createdAt: r.createdAt,
   }));
 
-  const currency = rows[0]?.currency ?? "USD";
-  return { totalGross, totalCommission, totalNet, currency, bySource, ledger };
+  return { byCurrency, ledger };
 }
 
 export interface PlatformCommission {
-  totalCommission: number;
-  totalGross: number;
-  count: number;
-  bySource: SourceRow[];
-  series: { date: string; commission: number }[];
+  byCurrency: CurrencyGroup[];
+  txCount: number;
+  seriesCount: { date: string; count: number }[]; // عدد المعاملات/يوم (محايد للعملة)
 }
 
-// سجلّ المنصّة الكلّي (admin).
+// سجلّ المنصّة الكلّي (admin) — مجمّع حسب العملة.
 export async function getPlatformCommission(): Promise<PlatformCommission> {
   const grouped = await prisma.commissionLedger.groupBy({
-    by: ["saleType"],
+    by: ["currency", "saleType"],
     where: { status: { in: EARNING_STATUSES } },
     _sum: { grossAmount: true, commissionAmount: true, netCreatorAmount: true },
     _count: { _all: true },
   });
-  const bySource: SourceRow[] = grouped
-    .map((g) => ({
-      saleType: g.saleType,
-      label: SALE_TYPE_LABEL[g.saleType] ?? g.saleType,
-      gross: g._sum.grossAmount ?? 0,
-      commission: g._sum.commissionAmount ?? 0,
-      net: g._sum.netCreatorAmount ?? 0,
-      count: g._count._all,
-    }))
-    .sort((a, b) => b.commission - a.commission);
+  const byCurrency = buildCurrencyGroups(grouped);
+  const txCount = byCurrency.reduce((s, g) => s + g.count, 0);
 
-  const totalCommission = bySource.reduce((s, r) => s + r.commission, 0);
-  const totalGross = bySource.reduce((s, r) => s + r.gross, 0);
-  const count = bySource.reduce((s, r) => s + r.count, 0);
-
-  // اتجاه 14 يوماً — bucketing في الذاكرة (حجم منخفض: صفّ لكل طلب).
+  // الاتجاه: عدد المعاملات/يوم (لا تُجمع مبالغ عملات مختلفة).
   const dates = lastNDates(14);
   const since = new Date(`${dates[0]}T00:00:00.000Z`);
   const recent = await prisma.commissionLedger.findMany({
     where: { status: { in: EARNING_STATUSES }, createdAt: { gte: since } },
-    select: { commissionAmount: true, createdAt: true },
+    select: { createdAt: true },
   });
   const byDay = new Map<string, number>();
   for (const r of recent) {
     const d = r.createdAt.toISOString().slice(0, 10);
-    byDay.set(d, (byDay.get(d) ?? 0) + r.commissionAmount);
+    byDay.set(d, (byDay.get(d) ?? 0) + 1);
   }
-  const series = dates.map((d) => ({ date: d, commission: byDay.get(d) ?? 0 }));
+  const seriesCount = dates.map((d) => ({ date: d, count: byDay.get(d) ?? 0 }));
 
-  return { totalCommission, totalGross, count, bySource, series };
+  return { byCurrency, txCount, seriesCount };
 }
