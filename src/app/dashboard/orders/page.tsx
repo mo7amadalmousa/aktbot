@@ -60,10 +60,13 @@ export default async function OrdersPage() {
     },
   });
 
-  const paidTotal = orders
-    .filter((o) => o.status === "PAID")
-    .reduce((sum, o) => sum + o.amount, 0);
-  const paidCurrency = orders.find((o) => o.status === "PAID")?.currency ?? "USD";
+  // 🔴 المبيعات المدفوعة مجمّعة حسب العملة (لا خلط عملات مختلفة).
+  const paidByCurrency = new Map<string, number>();
+  for (const o of orders) {
+    if (o.status !== "PAID") continue;
+    paidByCurrency.set(o.currency, (paidByCurrency.get(o.currency) ?? 0) + o.amount);
+  }
+  const paidEntries = [...paidByCurrency.entries()];
 
   return (
     <DashboardShell active="orders" email={session.email}>
@@ -76,9 +79,16 @@ export default async function OrdersPage() {
             </span>
             <span className="text-muted-foreground">
               المبيعات المدفوعة:{" "}
-              <strong className="text-primary">
-                {formatMoney(paidTotal, paidCurrency)}
-              </strong>
+              {paidEntries.length === 0 ? (
+                <strong className="text-primary">—</strong>
+              ) : (
+                paidEntries.map(([cur, sum], i) => (
+                  <strong key={cur} className="text-primary">
+                    {i > 0 ? " · " : ""}
+                    {formatMoney(sum, cur)}
+                  </strong>
+                ))
+              )}
             </span>
           </div>
         </div>

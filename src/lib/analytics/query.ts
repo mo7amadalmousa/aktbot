@@ -161,7 +161,8 @@ export interface PlatformAnalytics {
   totalUniques: number;
   orders: number;
   paidOrders: number;
-  salesMinor: number; // مجموع الطلبات المدفوعة (USD تقريبيّ — mock)
+  // 🔴 مبيعات مجمّعة حسب العملة (لا خلط) — [currency, minorSum].
+  salesByCurrency: { currency: string; sum: number }[];
   bookings: number;
   confirmedBookings: number;
   series: DayPoint[]; // آخر 14 يوماً عبر المنصّة
@@ -190,7 +191,7 @@ export async function getPlatformAnalytics(): Promise<PlatformAnalytics> {
     viewAgg,
     orders,
     paidOrders,
-    salesAgg,
+    salesGroups,
     bookings,
     confirmedBookings,
     seriesRows,
@@ -202,7 +203,7 @@ export async function getPlatformAnalytics(): Promise<PlatformAnalytics> {
     prisma.pageViewDaily.aggregate({ _sum: { views: true, uniques: true } }),
     prisma.order.count(),
     prisma.order.count({ where: { status: "PAID" } }),
-    prisma.order.aggregate({ where: { status: "PAID" }, _sum: { amount: true } }),
+    prisma.order.groupBy({ by: ["currency"], where: { status: "PAID" }, _sum: { amount: true } }),
     prisma.booking.count(),
     prisma.booking.count({ where: { status: "CONFIRMED" } }),
     prisma.pageViewDaily.groupBy({
@@ -265,7 +266,9 @@ export async function getPlatformAnalytics(): Promise<PlatformAnalytics> {
     totalUniques: viewAgg._sum.uniques ?? 0,
     orders,
     paidOrders,
-    salesMinor: salesAgg._sum.amount ?? 0,
+    salesByCurrency: salesGroups
+      .map((g) => ({ currency: g.currency, sum: g._sum.amount ?? 0 }))
+      .sort((a, b) => b.sum - a.sum),
     bookings,
     confirmedBookings,
     series,

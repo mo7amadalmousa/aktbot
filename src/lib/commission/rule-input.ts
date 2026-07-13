@@ -1,7 +1,9 @@
 import { asRecord, str, num } from "@/lib/public/block-config";
+import { toMinor, DEFAULT_CURRENCY } from "@/lib/payments/money";
 
-// تنقية إدخال قاعدة العمولة (خادميّ). النسبة تُدخَل مئويّة وتُخزَّن bps؛ المبلغ
-// الثابت يُدخَل major ويُخزَّن minor. رفض القيَم غير الصالحة عند الحفظ.
+// تنقية إدخال قاعدة العمولة (خادميّ). النسبة تُدخَل مئويّة وتُخزَّن bps (محايدة
+// للعملة). المبلغ الثابت يُدخَل major ويُخزَّن minor بمعامل العملة الافتراضيّة
+// (لا حقل عملة على القاعدة — يُوصى بالنسبة المئويّة لتعدّد العملات).
 export class RuleError extends Error {}
 
 const SCOPES = ["GLOBAL", "BY_TYPE", "BY_BRAND", "BY_CREATOR", "BY_CAMPAIGN"];
@@ -66,7 +68,7 @@ export function sanitizeRule(raw: unknown): CleanRule {
     if (percent > 100) throw new RuleError("النسبة يجب أن تكون بين 0 و100.");
     percentBps = Math.round(percent * 100); // 15 → 1500 bps
   } else if (fixedMajor !== null && fixedMajor > 0) {
-    fixedAmount = Math.round(fixedMajor * 100); // major → minor
+    fixedAmount = toMinor(fixedMajor, DEFAULT_CURRENCY); // major → minor (عملة افتراضيّة)
   } else {
     throw new RuleError("أدخل نسبة مئويّة أو مبلغاً ثابتاً أكبر من صفر.");
   }

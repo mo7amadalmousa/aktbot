@@ -17,7 +17,12 @@ import {
 } from "lucide-react";
 import { Field, TextInput } from "@/components/dashboard/field";
 import { ImageUpload } from "@/components/dashboard/image-upload";
-import { formatMoney } from "@/lib/payments/money";
+import {
+  formatMoney,
+  fromMinor,
+  currencyList,
+  minorStep,
+} from "@/lib/payments/money";
 
 type Kind = "DIGITAL" | "COURSE" | "PHYSICAL";
 
@@ -101,12 +106,12 @@ export function ProductManager({ initial }: { initial: DashProduct[] }) {
       type: p.type,
       title: p.title,
       description: p.description ?? "",
-      priceMajor: String(p.price / 100),
+      priceMajor: String(fromMinor(p.price, p.currency)),
       currency: p.currency,
       image: firstImage(p.images),
       isActive: p.isActive,
       stock: p.stock === null ? "" : String(p.stock),
-      shippingFeeMajor: p.shippingFee ? String(p.shippingFee / 100) : "",
+      shippingFeeMajor: p.shippingFee ? String(fromMinor(p.shippingFee, p.currency)) : "",
       file: null,
       existingFileName: p.file?.fileName ?? null,
     });
@@ -273,20 +278,24 @@ export function ProductManager({ initial }: { initial: DashProduct[] }) {
             <Field label="السعر">
               <TextInput
                 type="number"
+                step={minorStep(form.currency)}
                 value={form.priceMajor}
                 onChange={(v) => setForm({ ...form, priceMajor: v })}
                 placeholder="9.99"
               />
             </Field>
-            <div className="w-28 shrink-0">
+            <div className="w-32 shrink-0">
               <Field label="العملة">
                 <select
                   value={form.currency}
                   onChange={(e) => setForm({ ...form, currency: e.target.value })}
                   className="h-9 w-full rounded-lg border border-input bg-background px-2 text-sm text-foreground"
                 >
-                  <option value="USD">USD</option>
-                  <option value="TRY">TRY</option>
+                  {currencyList().map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.code} · {c.symbol}
+                    </option>
+                  ))}
                 </select>
               </Field>
             </div>
@@ -306,6 +315,7 @@ export function ProductManager({ initial }: { initial: DashProduct[] }) {
               <Field label="رسوم الشحن (اختياري)">
                 <TextInput
                   type="number"
+                  step={minorStep(form.currency)}
                   value={form.shippingFeeMajor}
                   onChange={(v) => setForm({ ...form, shippingFeeMajor: v })}
                   placeholder="0"

@@ -8,7 +8,7 @@ import {
   deleteManaged,
 } from "@/components/dashboard/image-upload";
 import { str, num, arr, asRecord } from "@/lib/public/block-config";
-import { formatMoney } from "@/lib/payments/money";
+import { formatMoney, currencyList } from "@/lib/payments/money";
 
 interface MyProduct {
   id: string;
@@ -167,8 +167,11 @@ export function StoreEditor({
                     onChange={(e) => patch(i, { currency: e.target.value })}
                     className="h-9 w-24 shrink-0 rounded-lg border border-input bg-background px-2 text-sm text-foreground"
                   >
-                    <option value="USD">USD</option>
-                    <option value="TRY">TRY</option>
+                    {currencyList().map((c) => (
+                      <option key={c.code} value={c.code}>
+                        {c.code}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <TextInput type="url" value={str(p.url)} onChange={(v) => patch(i, { url: v })} placeholder="رابط الشراء (https://)" />

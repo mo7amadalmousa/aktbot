@@ -217,7 +217,35 @@ async function seedLinaDigitalProduct(profileId: string, pageId: string) {
     select: { id: true },
   });
 
-  // بلوك متجر داخليّ يعرض الأنواع الثلاثة بأزرار شراء فعّالة.
+  // منتج رقميّ بعملة JOD (3 منازل عشريّة ×1000) — لاختبار المعامل غير الـ×100.
+  const jodTitle = "بطاقة ألوان الموسم (JOD)";
+  await prisma.product.deleteMany({
+    where: { creatorProfileId: profileId, title: jodTitle },
+  });
+  const jodProduct = await prisma.product.create({
+    data: {
+      creatorProfileId: profileId,
+      type: "DIGITAL",
+      title: jodTitle,
+      description: "بطاقة ألوان رقميّة — مُسعّرة بالدينار الأردنيّ (٣ منازل).",
+      price: 19999, // ‏19.999 JOD (×1000، لا ×100)
+      currency: "JOD",
+      images: [
+        "https://images.unsplash.com/photo-1556228578-8c89e6adf883?w=600&q=80",
+      ],
+      isActive: true,
+      assets: {
+        create: {
+          fileKey: "seed-lina-skincare-guide.pdf",
+          fileName: "color-card.pdf",
+          size: 128,
+        },
+      },
+    },
+    select: { id: true },
+  });
+
+  // بلوك متجر داخليّ يعرض الأنواع بأزرار شراء فعّالة (يشمل JOD).
   await prisma.block.create({
     data: {
       pageId,
@@ -226,13 +254,18 @@ async function seedLinaDigitalProduct(profileId: string, pageId: string) {
       visibility: true,
       config: {
         title: "متجري",
-        productIds: [product.id, course.id, physical.id],
+        productIds: [product.id, course.id, physical.id, jodProduct.id],
         products: [],
       },
     },
   });
 
-  return { digital: product.id, course: course.id, physical: physical.id };
+  return {
+    digital: product.id,
+    course: course.id,
+    physical: physical.id,
+    jod: jodProduct.id,
+  };
 }
 
 async function main() {

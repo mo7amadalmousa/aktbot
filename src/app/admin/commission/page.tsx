@@ -39,7 +39,7 @@ export default async function AdminCommissionPage() {
     label: r.label,
   }));
 
-  const maxCommission = Math.max(1, ...ledger.series.map((s) => s.commission));
+  const maxCount = Math.max(1, ...ledger.seriesCount.map((s) => s.count));
 
   return (
     <main className="min-h-dvh w-full bg-muted/20">
@@ -52,43 +52,60 @@ export default async function AdminCommissionPage() {
       </header>
 
       <div className="mx-auto w-full max-w-5xl space-y-6 p-5">
-        {/* نظرة السجلّ الكلّي */}
+        {/* نظرة السجلّ الكلّي — مجمّعة حسب العملة (لا خلط) */}
         <section>
-          <h1 className="mb-3 text-lg font-bold text-foreground">سجلّ عمولات المنصّة</h1>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <StatCard label="إجمالي العمولات" value={formatMoney(ledger.totalCommission, "USD")} sub={`${fmtNum(ledger.count)} معاملة`} icon={<DollarSign className="size-4" />} accent />
-            <StatCard label="إجمالي المبيعات" value={formatMoney(ledger.totalGross, "USD")} icon={<Receipt className="size-4" />} />
-            <StatCard label="متوسّط العمولة" value={ledger.totalGross > 0 ? `${((ledger.totalCommission / ledger.totalGross) * 100).toFixed(1)}%` : "—"} icon={<Percent className="size-4" />} />
-          </div>
+          <h1 className="mb-3 text-lg font-bold text-foreground">
+            سجلّ عمولات المنصّة{" "}
+            <span className="text-sm font-normal text-muted-foreground">
+              ({fmtNum(ledger.txCount)} معاملة)
+            </span>
+          </h1>
 
-          <div className="mt-3 grid gap-4 lg:grid-cols-2">
-            <div className="rounded-2xl border border-border bg-card p-4">
-              <p className="mb-3 text-sm font-semibold text-foreground">العمولة حسب المصدر</p>
-              {ledger.bySource.length === 0 ? (
-                <p className="py-4 text-center text-sm text-muted-foreground">لا معاملات بعد.</p>
-              ) : (
-                <div className="space-y-2">
-                  {ledger.bySource.map((s) => (
-                    <div key={s.saleType} className="flex items-center justify-between text-sm">
-                      <span className="text-foreground">{s.label}</span>
-                      <span className="text-muted-foreground">
-                        {formatMoney(s.commission, "USD")}{" "}
-                        <span className="text-xs">({s.count})</span>
-                      </span>
-                    </div>
-                  ))}
+          {ledger.byCurrency.length === 0 ? (
+            <p className="rounded-2xl border border-dashed border-border py-6 text-center text-sm text-muted-foreground">
+              لا معاملات بعد.
+            </p>
+          ) : (
+            ledger.byCurrency.map((g) => (
+              <div key={g.currency} className="mb-4">
+                {ledger.byCurrency.length > 1 ? (
+                  <p className="mb-2 text-sm font-semibold text-foreground">عملة {g.currency}</p>
+                ) : null}
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <StatCard label="إجمالي العمولات" value={formatMoney(g.commission, g.currency)} sub={`${fmtNum(g.count)} معاملة`} icon={<DollarSign className="size-4" />} accent />
+                  <StatCard label="إجمالي المبيعات" value={formatMoney(g.gross, g.currency)} icon={<Receipt className="size-4" />} />
+                  <StatCard label="متوسّط العمولة" value={g.gross > 0 ? `${((g.commission / g.gross) * 100).toFixed(1)}%` : "—"} icon={<Percent className="size-4" />} />
                 </div>
-              )}
-            </div>
-            <div className="rounded-2xl border border-border bg-card p-4">
-              <p className="mb-3 text-sm font-semibold text-foreground">اتجاه 14 يوماً</p>
-              <div className="flex h-24 items-end gap-0.5">
-                {ledger.series.map((s) => (
-                  <div key={s.date} className="group relative flex-1" title={`${s.date}: ${formatMoney(s.commission, "USD")}`}>
-                    <div className="w-full rounded-t bg-primary/70 group-hover:bg-primary" style={{ height: `${Math.max(2, (s.commission / maxCommission) * 100)}%` }} />
+                {g.bySource.length > 0 ? (
+                  <div className="mt-2 rounded-2xl border border-border bg-card p-4">
+                    <p className="mb-2 text-sm font-semibold text-foreground">العمولة حسب المصدر ({g.currency})</p>
+                    <div className="space-y-2">
+                      {g.bySource.map((s) => (
+                        <div key={s.saleType} className="flex items-center justify-between text-sm">
+                          <span className="text-foreground">{s.label}</span>
+                          <span className="text-muted-foreground">
+                            {formatMoney(s.commission, g.currency)}{" "}
+                            <span className="text-xs">({s.count})</span>
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                ))}
+                ) : null}
               </div>
+            ))
+          )}
+
+          <div className="rounded-2xl border border-border bg-card p-4">
+            <p className="mb-3 text-sm font-semibold text-foreground">
+              اتجاه المعاملات — 14 يوماً (محايد للعملة)
+            </p>
+            <div className="flex h-24 items-end gap-0.5">
+              {ledger.seriesCount.map((s) => (
+                <div key={s.date} className="group relative flex-1" title={`${s.date}: ${s.count} معاملة`}>
+                  <div className="w-full rounded-t bg-primary/70 group-hover:bg-primary" style={{ height: `${Math.max(2, (s.count / maxCount) * 100)}%` }} />
+                </div>
+              ))}
             </div>
           </div>
         </section>
