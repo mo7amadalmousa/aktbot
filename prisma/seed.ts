@@ -554,6 +554,71 @@ async function main() {
     },
   });
 
+  // ── طبقة العمولة: قاعدة شاملة 10% + استثناء الفيزيائيّ 5% ────────────
+  await prisma.commissionRule.deleteMany({ where: { label: { startsWith: "seed:" } } });
+  const globalRule = await prisma.commissionRule.create({
+    data: {
+      scope: "GLOBAL",
+      percentBps: 1000, // 10%
+      priority: 0,
+      isActive: true,
+      label: "seed:الافتراضيّة الشاملة",
+    },
+    select: { id: true },
+  });
+  const physRule = await prisma.commissionRule.create({
+    data: {
+      scope: "BY_TYPE",
+      saleType: "STORE_PHYSICAL",
+      percentBps: 500, // 5%
+      priority: 0,
+      isActive: true,
+      label: "seed:عمولة المنتجات الفيزيائيّة",
+    },
+    select: { id: true },
+  });
+
+  // مبيعات تجريبيّة مؤكّدة + سجلّ عمولة للينا (لعرض «أرباحي» والسجلّ الكلّي).
+  await prisma.order.deleteMany({
+    where: { buyerEmail: "demo-sales@aktbot.local" },
+  }); // cascade يحذف صفوف Ledger المرتبطة
+  const demoSales = [
+    { saleType: "CONSULTATION" as const, amount: 15000, blockType: "CONSULTATION" as const, productId: null as string | null, ruleId: globalRule.id, bps: 1000 },
+    { saleType: "STORE_DIGITAL" as const, amount: 1999, blockType: null as "CONSULTATION" | null, productId: linaProduct.digital, ruleId: globalRule.id, bps: 1000 },
+    { saleType: "STORE_PHYSICAL" as const, amount: 4000, blockType: null as "CONSULTATION" | null, productId: linaProduct.physical, ruleId: physRule.id, bps: 500 },
+  ];
+  for (const s of demoSales) {
+    const comm = Math.round((s.amount * s.bps) / 10000);
+    const order = await prisma.order.create({
+      data: {
+        creatorProfileId: lina.profileId,
+        buyerName: "عميل تجريبيّ",
+        buyerEmail: "demo-sales@aktbot.local",
+        amount: s.amount,
+        currency: "USD",
+        status: "PAID",
+        provider: "mock",
+        blockType: s.blockType,
+        productId: s.productId,
+        metadata: { title: "مبيعة تجريبيّة" },
+      },
+      select: { id: true },
+    });
+    await prisma.commissionLedger.create({
+      data: {
+        orderId: order.id,
+        creatorProfileId: lina.profileId,
+        saleType: s.saleType,
+        grossAmount: s.amount,
+        commissionAmount: comm,
+        netCreatorAmount: s.amount - comm,
+        appliedRuleId: s.ruleId,
+        currency: "USD",
+        status: "ACCRUED",
+      },
+    });
+  }
+
   console.log("✓ seeded:", lina, sara, linaProduct);
 }
 

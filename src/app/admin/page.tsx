@@ -52,7 +52,15 @@ export default async function AdminPage() {
       </header>
 
       <div className="mx-auto w-full max-w-6xl p-5">
-        <h1 className="mb-4 text-lg font-bold text-foreground">نظرة عامّة على المنصّة</h1>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-lg font-bold text-foreground">نظرة عامّة على المنصّة</h1>
+          <Link
+            href="/admin/commission"
+            className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+          >
+            طبقة العمولة ←
+          </Link>
+        </div>
 
         <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard label="المبدعون" value={fmtNum(a.creators)} sub={`${fmtNum(a.published)} صفحة منشورة`} icon={<Users className="size-4" />} accent />

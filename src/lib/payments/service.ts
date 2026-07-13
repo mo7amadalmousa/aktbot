@@ -479,6 +479,10 @@ export async function processPaymentEvent(
     data: { status: "PAID" },
   });
 
+  // طبقة العمولة: تُحسب وتُسجَّل هنا لكلّ المصادر (idempotent عبر orderId الفريد).
+  const { accrueCommission } = await import("@/lib/commission/engine");
+  await accrueCommission(order.id);
+
   // مسار المنتج: يتفرّع حسب النوع (تسليم مختلف فوق نفس الطلب الموحّد).
   if (order.productId) {
     const type = order.product?.type;
