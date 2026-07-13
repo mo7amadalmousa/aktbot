@@ -116,6 +116,7 @@ model CreatorProfile {
   page        Page?
   orders      Order[]
   subscribers NewsletterSubscriber[]
+  products    Product[]
 }
 
 // مشتركو النشرة البريديّة لكل مبدع (جمع فقط الآن؛ إرسال الحملات لاحقاً).
@@ -199,19 +200,81 @@ model Order {
   creatorProfileId String
   buyerName        String
   buyerEmail       String
-  blockType        BlockType // CONSULTATION | PAID_VIDEO
-  blockId          String
+  blockType        BlockType? // طلب بلوك: CONSULTATION | PAID_VIDEO
+  blockId          String?
+  productId        String? // طلب منتج متجر (بديل عن البلوك)
   amount           Int // أصغر وحدة (minor units) — لتفادي أخطاء العشرية
   currency         String
   status           OrderStatus @default(PENDING)
   provider         String      @default("mock")
   providerRef      String?     @unique // مرجع المزوّد — يضمن idempotency للـwebhook
-  metadata         Json? // تفاصيل الاستشارة/الفيديو + تعليمات المشتري
+  metadata         Json?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  creatorProfile CreatorProfile  @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
+  product        Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
+  downloadTokens DownloadToken[]
+
+  @@index([creatorProfileId])
+  @@index([status])
+}
+
+// ── المتجر الفعليّ (شراء داخليّ) ──────────────────────────────────────
+enum ProductType {
+  DIGITAL
+  COURSE
+  PHYSICAL
+}
+
+model Product {
+  id               String      @id @default(cuid())
+  creatorProfileId String
+  type             ProductType @default(DIGITAL)
+  title            String
+  description      String?
+  price            Int // minor units
+  currency         String
+  images           Json? // روابط صور (عبر طبقة الرفع)
+  isActive         Boolean     @default(true)
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 
   creatorProfile CreatorProfile @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
+  assets         ProductAsset[]
+  orders         Order[]
 
   @@index([creatorProfileId])
-  @@index([status])
+}
+
+// ملف المنتج الرقميّ — تخزين خاصّ (fileKey في UPLOAD_DIR/private، لا يُخدَم عاماً).
+model ProductAsset {
+  id        String   @id @default(cuid())
+  productId String
+  fileKey   String // مفتاح الملف الخاصّ
+  fileName  String
+  size      Int
+  createdAt DateTime @default(now())
+
+  product        Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  downloadTokens DownloadToken[]
+
+  @@index([productId])
+}
+
+// رابط تحميل آمن محدود بعد دفع مؤكّد (توكن مجزّأ · صلاحية · حدّ تحميل).
+model DownloadToken {
+  id             String   @id @default(cuid())
+  orderId        String
+  productAssetId String
+  tokenHash      String   @unique
+  expiresAt      DateTime
+  maxDownloads   Int      @default(5)
+  downloadCount  Int      @default(0)
+  createdAt      DateTime @default(now())
+
+  order        Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productAsset ProductAsset @relation(fields: [productAssetId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
 }
