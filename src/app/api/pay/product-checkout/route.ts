@@ -4,6 +4,10 @@ import {
   CheckoutError,
   type ShippingInput,
 } from "@/lib/payments/service";
+import {
+  ATTR_COOKIE,
+  resolveActiveParticipationRef,
+} from "@/lib/attribution/engine";
 
 export const runtime = "nodejs";
 
@@ -25,12 +29,19 @@ export async function POST(req: NextRequest) {
   };
   const hasShipping = Boolean(shipping.fullName || shipping.line || shipping.city);
 
+  // إسناد حملة: من كوكي الرابط أو كود مُدخَل — نشط فقط.
+  const participationId = await resolveActiveParticipationRef(
+    req.cookies.get(ATTR_COOKIE)?.value,
+    String(form.get("attrCode") ?? "") || null,
+  );
+
   try {
     const { checkoutUrl } = await createOrderForProduct({
       productId,
       buyerName,
       buyerEmail,
       shipping: hasShipping ? shipping : undefined,
+      participationId,
     });
     return NextResponse.redirect(new URL(checkoutUrl, req.url), { status: 303 });
   } catch (e) {

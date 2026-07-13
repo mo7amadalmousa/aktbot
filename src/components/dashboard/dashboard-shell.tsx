@@ -8,6 +8,7 @@ import {
   Tag,
   BarChart3,
   Wallet,
+  Megaphone,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -22,7 +23,8 @@ type NavKey =
   | "subscribers"
   | "coupons"
   | "analytics"
-  | "earnings";
+  | "earnings"
+  | "campaigns";
 
 export function DashboardShell({
   active,
@@ -67,6 +69,7 @@ export function DashboardShell({
           {navItem("bookings", "/dashboard/bookings", "المواعيد", CalendarClock)}
           {navItem("orders", "/dashboard/orders", "الطلبات", ShoppingBag)}
           {navItem("earnings", "/dashboard/earnings", "أرباحي", Wallet)}
+          {navItem("campaigns", "/dashboard/campaigns", "حملاتي", Megaphone)}
           {navItem("subscribers", "/dashboard/subscribers", "المشتركون", Mail)}
           {navItem("coupons", "/dashboard/coupons", "الخصومات", Tag)}
           {navItem("analytics", "/dashboard/analytics", "التحليلات", BarChart3)}

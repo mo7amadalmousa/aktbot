@@ -5,6 +5,10 @@ import {
   createPaidBookingOrder,
   BookingError,
 } from "@/lib/booking/service";
+import {
+  ATTR_COOKIE,
+  resolveActiveParticipationRef,
+} from "@/lib/attribution/engine";
 
 export const runtime = "nodejs";
 
@@ -27,11 +31,16 @@ export async function POST(req: NextRequest) {
     if (!loaded) return backWithError("الحجز غير متاح لهذا العنصر.");
 
     if (loaded.config.mode === "PAID") {
+      const participationId = await resolveActiveParticipationRef(
+        req.cookies.get(ATTR_COOKIE)?.value,
+        null,
+      );
       const { orderId } = await createPaidBookingOrder({
         blockId,
         buyerName,
         buyerEmail,
         startISO,
+        participationId,
       });
       return NextResponse.redirect(new URL(`/pay/${orderId}`, req.url), {
         status: 303,

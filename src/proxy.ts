@@ -26,7 +26,7 @@ function zoneForHost(host: string): Zone {
 }
 
 // مسارات منطقة app التي تتطلّب جلسة صالحة.
-const APP_PROTECTED_PREFIXES = ["/dashboard", "/admin"];
+const APP_PROTECTED_PREFIXES = ["/dashboard", "/admin", "/brand"];
 
 function needsAuth(pathname: string): boolean {
   return APP_PROTECTED_PREFIXES.some(
@@ -37,6 +37,11 @@ function needsAuth(pathname: string): boolean {
 // مسارات لوحة الإشراف — دور ADMIN حصراً.
 function isAdminPath(pathname: string): boolean {
   return pathname === "/admin" || pathname.startsWith("/admin/");
+}
+
+// منطقة العلامة — دور BRAND (أو ADMIN للإشراف).
+function isBrandPath(pathname: string): boolean {
+  return pathname === "/brand" || pathname.startsWith("/brand/");
 }
 
 export async function proxy(req: NextRequest) {
@@ -76,6 +81,17 @@ export async function proxy(req: NextRequest) {
     if (isAdminPath(pathname) && session.role !== "ADMIN") {
       const url = req.nextUrl.clone();
       url.pathname = "/dashboard";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
+    // منطقة العلامة: دور BRAND أو ADMIN — غيرهم يُحوَّل لتفعيل العلامة.
+    if (
+      isBrandPath(pathname) &&
+      session.role !== "BRAND" &&
+      session.role !== "ADMIN"
+    ) {
+      const url = req.nextUrl.clone();
+      url.pathname = "/become-brand";
       url.search = "";
       return NextResponse.redirect(url);
     }

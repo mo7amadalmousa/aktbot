@@ -172,6 +172,7 @@ interface BookingInput {
   buyerName: string;
   buyerEmail: string;
   startISO: string;
+  participationId?: string | null; // إسناد حملة (اختياريّ)
 }
 
 function cleanBuyer(name: string, email: string) {
@@ -282,6 +283,7 @@ export async function createPaidBookingOrder(input: BookingInput) {
       buyerEmail,
       blockType: "CONSULTATION",
       blockId: r.block.id,
+      participationId: input.participationId ?? null,
       amount: amountMinor,
       currency: r.config.currency,
       status: "PENDING",

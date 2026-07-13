@@ -150,6 +150,7 @@ export async function accrueCommission(orderId: string): Promise<void> {
       currency: true,
       creatorProfileId: true,
       productId: true,
+      participationId: true,
       blockType: true,
       metadata: true,
       status: true,
@@ -165,13 +166,17 @@ export async function accrueCommission(orderId: string): Promise<void> {
   });
   if (existing) return;
 
+  // الإسناد: يسجّل SALE ويعيد الحملة/العلامة (إن كان الطلب مُسنَداً) — idempotent.
+  const { recordSaleAttribution } = await import("@/lib/attribution/engine");
+  const attr = await recordSaleAttribution(order);
+
   const saleType = saleTypeForOrder(order);
   const rules = await prisma.commissionRule.findMany({ where: { isActive: true } });
   const rule = resolveRule(rules as RuleRow[], {
     saleType,
     creatorProfileId: order.creatorProfileId,
-    brandId: null,
-    campaignId: null,
+    brandId: attr.brandId,
+    campaignId: attr.campaignId,
     now: new Date(),
   });
   const computed = computeCommission(order.amount, rule);
@@ -181,6 +186,8 @@ export async function accrueCommission(orderId: string): Promise<void> {
       data: {
         orderId: order.id,
         creatorProfileId: order.creatorProfileId,
+        brandId: attr.brandId,
+        campaignId: attr.campaignId,
         saleType,
         grossAmount: order.amount,
         commissionAmount: computed.commissionAmount,

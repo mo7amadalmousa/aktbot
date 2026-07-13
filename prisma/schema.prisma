@@ -53,6 +53,7 @@ model User {
   updatedAt     DateTime @updatedAt
 
   creatorProfile          CreatorProfile?
+  brandProfile            BrandProfile?
   emailVerificationTokens EmailVerificationToken[]
   passwordResetTokens     PasswordResetToken[]
   mediaAssets             MediaAsset[]
@@ -122,6 +123,7 @@ model CreatorProfile {
   pageViews    PageViewDaily[]
   blockClicks  BlockClick[]
   commissions  CommissionLedger[]
+  participations CampaignParticipation[]
 }
 
 // مشتركو النشرة البريديّة لكل مبدع (جمع فقط الآن؛ إرسال الحملات لاحقاً).
@@ -208,6 +210,7 @@ model Order {
   blockType        BlockType? // طلب بلوك: CONSULTATION | PAID_VIDEO
   blockId          String?
   productId        String? // طلب منتج متجر (بديل عن البلوك)
+  participationId  String? // إسناد لحملة (عبر رابط/كود المبدع) — لتوزيع العمولة
   amount           Int // أصغر وحدة (minor units) — لتفادي أخطاء العشرية
   currency         String
   status           OrderStatus @default(PENDING)
@@ -228,9 +231,11 @@ model Order {
   shippingAddress ShippingAddress?
   booking         Booking?
   commission      CommissionLedger?
+  participation   CampaignParticipation? @relation(fields: [participationId], references: [id], onDelete: SetNull)
 
   @@index([creatorProfileId])
   @@index([status])
+  @@index([participationId])
 }
 
 // ── المتجر الفعليّ (شراء داخليّ) ──────────────────────────────────────
@@ -546,4 +551,106 @@ model CommissionLedger {
   @@index([creatorProfileId])
   @@index([status])
   @@index([saleType])
+}
+
+// ── دور العلامة (BRAND) + محرّك الإسناد ───────────────────────────────
+// حساب علامة موازٍ لـCreatorProfile. الحملات الكاملة لاحقاً (ن18) — هنا الهيكل.
+model BrandProfile {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  brandName    String
+  logoUrl      String?
+  website      String?
+  description  String?
+  contactEmail String?
+  isVerified   Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaigns Campaign[]
+}
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ENDED
+}
+
+enum CampaignType {
+  SALE
+  PERFORMANCE
+  UGC
+}
+
+model Campaign {
+  id        String         @id @default(cuid())
+  brandId   String
+  title     String
+  status    CampaignStatus @default(DRAFT)
+  type      CampaignType   @default(SALE)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  brand          BrandProfile            @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  participations CampaignParticipation[]
+
+  @@index([brandId])
+}
+
+enum ParticipationStatus {
+  INVITED
+  JOINED
+  ACTIVE
+  LEFT
+}
+
+// قلب الإسناد: كل مبدع×حملة له كود ورابط فريدان + عدّادات أداء مجمّعة.
+model CampaignParticipation {
+  id               String              @id @default(cuid())
+  campaignId       String
+  creatorProfileId String
+  uniqueCode       String              @unique // كود الشراء (كوبون إسناد)
+  uniqueLink       String              @unique // مسار التتبّع (/r/<code>)
+  status           ParticipationStatus @default(ACTIVE)
+  // أداء مجمّع (O(1) قراءة) — يُغذّي ROI لاحقاً.
+  clicks           Int                 @default(0)
+  conversions      Int                 @default(0)
+  sales            Int                 @default(0)
+  salesValue       Int                 @default(0) // minor
+  joinedAt         DateTime?
+  createdAt        DateTime            @default(now())
+
+  campaign          Campaign           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  creatorProfile    CreatorProfile     @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
+  attributionEvents AttributionEvent[]
+  orders            Order[]
+
+  @@unique([campaignId, creatorProfileId])
+  @@index([campaignId])
+  @@index([creatorProfileId])
+}
+
+enum AttributionType {
+  CLICK
+  CONVERSION
+  SALE
+}
+
+// سجلّ الإسناد الخام (S2S-ready). لا PII — visitorRef مجهول.
+model AttributionEvent {
+  id              String          @id @default(cuid())
+  participationId String
+  type            AttributionType
+  orderId         String? // بيع مُسنَد (بلا FK — ربط رخو)
+  amount          Int? // minor
+  visitorRef      String? // مجهول
+  source          String?
+  createdAt       DateTime        @default(now())
+
+  participation CampaignParticipation @relation(fields: [participationId], references: [id], onDelete: Cascade)
+
+  @@index([participationId])
+  @@index([type])
 }
