@@ -7,6 +7,7 @@ import {
   Mail,
   Tag,
   BarChart3,
+  Wallet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -20,7 +21,8 @@ type NavKey =
   | "orders"
   | "subscribers"
   | "coupons"
-  | "analytics";
+  | "analytics"
+  | "earnings";
 
 export function DashboardShell({
   active,
@@ -64,6 +66,7 @@ export function DashboardShell({
           {navItem("products", "/dashboard/products", "المنتجات", Package)}
           {navItem("bookings", "/dashboard/bookings", "المواعيد", CalendarClock)}
           {navItem("orders", "/dashboard/orders", "الطلبات", ShoppingBag)}
+          {navItem("earnings", "/dashboard/earnings", "أرباحي", Wallet)}
           {navItem("subscribers", "/dashboard/subscribers", "المشتركون", Mail)}
           {navItem("coupons", "/dashboard/coupons", "الخصومات", Tag)}
           {navItem("analytics", "/dashboard/analytics", "التحليلات", BarChart3)}

@@ -121,6 +121,7 @@ model CreatorProfile {
   bookings     Booking[]
   pageViews    PageViewDaily[]
   blockClicks  BlockClick[]
+  commissions  CommissionLedger[]
 }
 
 // مشتركو النشرة البريديّة لكل مبدع (جمع فقط الآن؛ إرسال الحملات لاحقاً).
@@ -226,6 +227,7 @@ model Order {
   enrollment      CourseEnrollment?
   shippingAddress ShippingAddress?
   booking         Booking?
+  commission      CommissionLedger?
 
   @@index([creatorProfileId])
   @@index([status])
@@ -470,4 +472,78 @@ model BlockClick {
   creatorProfile CreatorProfile @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
 
   @@index([creatorProfileId])
+}
+
+// ── طبقة العمولة: محرّك هرميّ + سجلّ Ledger ───────────────────────────
+// المنصّة مجّانيّة، دخلها عمولة على كل بيعة مؤكّدة. القاعدة الأخصّ تفوز.
+enum CommissionScope {
+  GLOBAL // افتراضيّ شامل (fallback)
+  BY_TYPE // حسب نوع البيع
+  BY_BRAND // حسب العلامة (طبقة لاحقة)
+  BY_CREATOR // حسب المبدع
+  BY_CAMPAIGN // حسب الحملة (طبقة لاحقة)
+}
+
+enum SaleType {
+  CONSULTATION
+  VIDEO
+  STORE_DIGITAL
+  STORE_COURSE
+  STORE_PHYSICAL
+  BOOKING
+  CAMPAIGN // لاحقاً
+  USAGE_RIGHTS // لاحقاً
+}
+
+enum LedgerStatus {
+  ACCRUED // مستحقّة (لم تُسوَّ بعد — السحب لاحقاً)
+  SETTLED // سُوِّيت (مع مزوّد حقيقيّ)
+  REVERSED // عُكِست (استرداد/إلغاء)
+}
+
+// قاعدة عمولة — بأيّ مستوى (عام/نوع/علامة/مبدع/حملة) + فترة زمنيّة اختياريّة.
+// النسبة بنقاط الأساس (bps: 1000 = 10%) أو مبلغ ثابت (minor) — لدقّة عدد صحيح.
+model CommissionRule {
+  id          String          @id @default(cuid())
+  scope       CommissionScope @default(GLOBAL)
+  targetId    String? // creatorProfileId | brandId | campaignId — حسب scope
+  saleType    SaleType? // مطابقة نوع البيع (إلزاميّ لـBY_TYPE، فلتر اختياريّ لغيره)
+  percentBps  Int? // نقاط أساس (1000 = 10.00%)
+  fixedAmount Int? // مبلغ ثابت minor (بديل عن النسبة)
+  priority    Int             @default(0) // كسر التعادل داخل نفس المستوى
+  startAt     DateTime? // بداية سريان (null = بلا حدّ)
+  endAt       DateTime? // نهاية سريان (null = بلا حدّ)
+  isActive    Boolean         @default(true)
+  label       String? // وصف إداريّ اختياريّ
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([scope])
+  @@index([isActive])
+  @@index([saleType])
+}
+
+// سجلّ العمولة — مصدر الحقيقة. صفّ لكل طلب مؤكّد (قيد فريد يمنع الازدواج).
+model CommissionLedger {
+  id               String       @id @default(cuid())
+  orderId          String       @unique
+  creatorProfileId String
+  brandId          String? // طبقة لاحقة
+  campaignId       String? // طبقة لاحقة
+  saleType         SaleType
+  grossAmount      Int // إجماليّ البيع (minor)
+  commissionAmount Int // عمولة المنصّة (minor)
+  netCreatorAmount Int // صافي المبدع (minor)
+  appliedRuleId    String? // القاعدة المطبّقة (null = fallback صفر)
+  currency         String
+  status           LedgerStatus @default(ACCRUED)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  creatorProfile CreatorProfile @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
+  order          Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([creatorProfileId])
+  @@index([status])
+  @@index([saleType])
 }
