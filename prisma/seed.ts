@@ -2,6 +2,7 @@ import "dotenv/config";
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+import { writePrivateFile } from "../src/lib/storage/private-files";
 
 // بذرة عرض idempotent — محصورة ببيانات الديمو (قابلة للحذف لاحقاً).
 // تشغيل: npm run db:seed
@@ -84,7 +85,64 @@ async function seedCreator(input: {
     })),
   });
 
-  return { username: input.username, blocks: input.blocks.length };
+  return {
+    username: input.username,
+    blocks: input.blocks.length,
+    profileId: profile.id,
+    pageId: page.id,
+  };
+}
+
+// منتج رقميّ حقيقيّ للينا + بلوك متجر داخليّ يعرضه (شراء عبر المنصّة).
+// idempotent: يُعاد إنشاء المنتج بنفس العنوان + ملف خاصّ بمفتاح ثابت.
+async function seedLinaDigitalProduct(profileId: string, pageId: string) {
+  const FILE_KEY = "seed-lina-skincare-guide.pdf";
+  const bytes = Buffer.from(
+    "%PDF-1.4\nAktBot demo — دليل العناية بالبشرة الكامل\n(هذا ملف تجريبيّ للتحميل الآمن)\n",
+    "utf8",
+  );
+  await writePrivateFile(FILE_KEY, bytes);
+
+  const title = "دليل العناية بالبشرة الكامل (PDF)";
+  await prisma.product.deleteMany({
+    where: { creatorProfileId: profileId, title },
+  });
+  const product = await prisma.product.create({
+    data: {
+      creatorProfileId: profileId,
+      type: "DIGITAL",
+      title,
+      description:
+        "دليل PDF شامل: روتين صباحيّ ومسائيّ + قائمة مكوّنات موصى بها + جدول أسبوعيّ.",
+      price: 1999, // ‏$19.99 بأصغر وحدة
+      currency: "USD",
+      images: [
+        "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=600&q=80",
+      ],
+      isActive: true,
+      assets: {
+        create: {
+          fileKey: FILE_KEY,
+          fileName: "skincare-guide.pdf",
+          size: bytes.byteLength,
+        },
+      },
+    },
+    select: { id: true },
+  });
+
+  // بلوك متجر داخليّ يعرض المنتج بزرّ شراء فعّال.
+  await prisma.block.create({
+    data: {
+      pageId,
+      type: "STORE",
+      order: 10,
+      visibility: true,
+      config: { title: "متجري", productIds: [product.id], products: [] },
+    },
+  });
+
+  return { productId: product.id };
 }
 
 async function main() {
@@ -301,7 +359,9 @@ async function main() {
     ],
   });
 
-  console.log("✓ seeded:", lina, sara);
+  const linaProduct = await seedLinaDigitalProduct(lina.profileId, lina.pageId);
+
+  console.log("✓ seeded:", lina, sara, linaProduct);
 }
 
 main()

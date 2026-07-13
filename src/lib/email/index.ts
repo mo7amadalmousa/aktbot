@@ -125,3 +125,77 @@ export async function sendOrderCreatorNotification(
 <p style="color:#666">راجع طلباتك من لوحة التحكّم.<br/>— ${FROM}</p>`,
   });
 }
+
+// ── تسليم المنتج الرقميّ (بعد نجاح الدفع) ─────────────────────────────
+interface ProductDeliveryData {
+  buyerName: string;
+  buyerEmail: string;
+  productTitle: string;
+  fileName: string;
+  amountLabel: string;
+  creatorName: string;
+  expiresDays: number;
+  maxDownloads: number;
+}
+
+// رابط التحميل يُبنى هنا من التوكن الخام — لا يُخزَّن التوكن الخام في القاعدة.
+export async function sendProductDeliveryEmail(
+  data: ProductDeliveryData,
+  rawToken: string,
+): Promise<void> {
+  const link = `${appUrl()}/api/download/${rawToken}`;
+  await getEmailAdapter().send({
+    to: data.buyerEmail,
+    subject: `AktBot — تحميل «${data.productTitle}»`,
+    text: [
+      `مرحباً ${data.buyerName}،`,
+      "",
+      `تمّ الدفع بنجاح لـ«${data.productTitle}» لدى ${data.creatorName}.`,
+      `المبلغ: ${data.amountLabel}`,
+      "",
+      "رابط التحميل الخاصّ بك (لا تشاركه):",
+      link,
+      "",
+      `الرابط صالح ${data.expiresDays} يوماً وحتى ${data.maxDownloads} مرّات تحميل.`,
+      `— ${FROM}`,
+    ].join("\n"),
+    html: `<p>مرحباً ${data.buyerName}،</p>
+<p>تمّ الدفع بنجاح لـ«<strong>${data.productTitle}</strong>» لدى ${data.creatorName}.</p>
+<p>المبلغ: <strong>${data.amountLabel}</strong></p>
+<p>رابط التحميل الخاصّ بك (لا تشاركه):</p>
+<p><a href="${link}">تحميل «${data.productTitle}»</a></p>
+<p style="color:#666">الرابط صالح ${data.expiresDays} يوماً وحتى ${data.maxDownloads} مرّات تحميل.<br/>— ${FROM}</p>`,
+  });
+}
+
+interface ProductSaleData {
+  creatorName: string;
+  productTitle: string;
+  buyerName: string;
+  buyerEmail: string;
+  amountLabel: string;
+}
+
+export async function sendProductSaleNotification(
+  creatorEmail: string,
+  data: ProductSaleData,
+): Promise<void> {
+  await getEmailAdapter().send({
+    to: creatorEmail,
+    subject: `AktBot — بيع جديد: ${data.productTitle}`,
+    text: [
+      `مرحباً ${data.creatorName}،`,
+      "",
+      `بِعتَ منتجاً رقميّاً: «${data.productTitle}».`,
+      `المشتري: ${data.buyerName} <${data.buyerEmail}>`,
+      `المبلغ: ${data.amountLabel}`,
+      "",
+      "راجع مبيعاتك من لوحة التحكّم.",
+      `— ${FROM}`,
+    ].join("\n"),
+    html: `<p>مرحباً ${data.creatorName}،</p>
+<p>بِعتَ منتجاً رقميّاً: «<strong>${data.productTitle}</strong>».</p>
+<p>المشتري: ${data.buyerName} &lt;${data.buyerEmail}&gt;<br/>المبلغ: <strong>${data.amountLabel}</strong></p>
+<p style="color:#666">راجع مبيعاتك من لوحة التحكّم.<br/>— ${FROM}</p>`,
+  });
+}

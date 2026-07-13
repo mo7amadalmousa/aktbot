@@ -46,6 +46,30 @@ export default async function PublicPage({
     countMap.get(cc.blockId)!.set(cc.couponId, cc.count);
   }
 
+  // منتجات المتجر الداخليّة — تُحلّ خادميّاً (سعر القاعدة) وتُحقن في config.
+  // أمان: منتجات هذا المبدع فقط · فعّالة · رقميّة · لها ملف (قابلة للتسليم).
+  const storeIds = new Set<string>();
+  for (const b of allBlocks) {
+    if (b.type !== "STORE") continue;
+    for (const pid of arr(asRecord(b.config).productIds)) {
+      const s = str(pid);
+      if (s) storeIds.add(s);
+    }
+  }
+  const storeProducts = storeIds.size
+    ? await prisma.product.findMany({
+        where: {
+          id: { in: [...storeIds] },
+          creatorProfileId: profile.id,
+          isActive: true,
+          type: "DIGITAL",
+          assets: { some: {} },
+        },
+        select: { id: true, title: true, price: true, currency: true, images: true },
+      })
+    : [];
+  const productMap = new Map(storeProducts.map((p) => [p.id, p]));
+
   // فلترة خادميّة: أخفِ ستوري TIME_24H المنتهية.
   const now = Date.now();
   const blocks = allBlocks
@@ -67,6 +91,20 @@ export default async function PublicPage({
           return { ...r, copyCount: cm?.get(str(r.id)) ?? 0 };
         });
         return { id: b.id, type: b.type, config: { ...cfg, coupons } };
+      }
+      if (b.type === "STORE") {
+        const cfg = asRecord(b.config);
+        const resolvedProducts = arr(cfg.productIds)
+          .map((pid) => productMap.get(str(pid)))
+          .filter((p): p is NonNullable<typeof p> => Boolean(p))
+          .map((p) => ({
+            id: p.id,
+            title: p.title,
+            price: p.price, // minor units — سعر القاعدة
+            currency: p.currency,
+            image: str((arr(p.images).map((u) => str(u)))[0]),
+          }));
+        return { id: b.id, type: b.type, config: { ...cfg, resolvedProducts } };
       }
       return { id: b.id, type: b.type, config: b.config };
     });

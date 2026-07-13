@@ -184,6 +184,12 @@ function sanitizeBlockConfig(type: string, config: unknown): unknown {
       };
     }
     case "STORE": {
+      // منتجات داخليّة حقيقيّة (بالمعرّف — تُحلّ خادميّاً في الصفحة العامّة).
+      const productIds = arr(c.productIds)
+        .map((v) => str(v))
+        .filter((s) => /^[a-z0-9]{20,40}$/i.test(s))
+        .slice(0, 30);
+      // منتجات خارجيّة (أفلييت) — توافق خلفيّ مع الشكل القديم.
       const products = arr(c.products)
         .map((p) => {
           const r = asRecord(p);
@@ -198,7 +204,7 @@ function sanitizeBlockConfig(type: string, config: unknown): unknown {
         })
         .filter((p) => p.title || p.url || p.imageUrl)
         .slice(0, 30);
-      return { title: str(c.title).slice(0, 120), products };
+      return { title: str(c.title).slice(0, 120), productIds, products };
     }
     case "NEWSLETTER": {
       return {
