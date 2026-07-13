@@ -1,9 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { asRecord, str, num } from "@/lib/public/block-config";
-import {
-  isValidEmail,
-  normalizeEmail,
-} from "@/lib/validation";
+import { isValidEmail, normalizeEmail } from "@/lib/validation";
 import {
   getPaymentProvider,
   toMinor,
@@ -11,12 +8,17 @@ import {
   isSupportedCurrency,
 } from "@/lib/payments";
 import type { NormalizedEvent } from "@/lib/payments/types";
+import type { ProductType } from "@/generated/prisma/enums";
 import { generateToken, hashToken } from "@/lib/auth/tokens";
 import {
   sendOrderBuyerConfirmation,
   sendOrderCreatorNotification,
   sendProductDeliveryEmail,
   sendProductSaleNotification,
+  sendCourseAccessEmail,
+  sendCourseSaleNotification,
+  sendPhysicalOrderConfirmation,
+  sendPhysicalSaleNotification,
 } from "@/lib/email";
 
 export class CheckoutError extends Error {}
@@ -27,11 +29,18 @@ const PAID_TYPES = new Set(["CONSULTATION", "PAID_VIDEO"]);
 const DOWNLOAD_TTL_DAYS = 30;
 const DOWNLOAD_MAX = 5;
 
-// وسم نوع الطلب في العرض. منتج المتجر → «منتج رقميّ».
+// وسوم أنواع منتجات المتجر (للعرض/البريد).
+export const PRODUCT_TYPE_LABEL: Record<string, string> = {
+  DIGITAL: "منتج رقميّ",
+  COURSE: "كورس",
+  PHYSICAL: "منتج فيزيائيّ",
+};
+
+// وسم نوع الطلب في العرض. طلب بلوك → استشارة/فيديو؛ طلب منتج → حسب النوع.
 export function kindLabel(blockType: string | null | undefined): string {
   if (blockType === "CONSULTATION") return "استشارة";
   if (blockType === "PAID_VIDEO") return "فيديو خاص";
-  return "منتج رقميّ";
+  return "منتج";
 }
 
 // يحمّل بلوكاً مدفوعاً قابلاً للشراء (منشور · ظاهر · نوع مدفوع) مع سعره من القاعدة.
@@ -72,7 +81,9 @@ export async function loadPurchasableBlock(blockId: string) {
   };
 }
 
-// يحمّل منتجاً رقميّاً قابلاً للشراء (فعّال · DIGITAL · له ملف · مبدع منشور) بسعر القاعدة.
+// يحمّل منتجاً قابلاً للشراء بأيّ نوع (فعّال · منشور · سعر من القاعدة)، مع تحقّق
+// خاصّ بكلّ نوع: DIGITAL له ملف · COURSE له درس واحد على الأقل · PHYSICAL بمخزون
+// متاح (إن كان محدوداً). amountMinor يشمل رسوم الشحن للفيزيائيّ.
 export async function loadPurchasableProduct(productId: string) {
   const product = await prisma.product.findUnique({
     where: { id: productId },
@@ -81,26 +92,41 @@ export async function loadPurchasableProduct(productId: string) {
         select: { id: true, displayName: true, isPublished: true, username: true },
       },
       assets: { orderBy: { createdAt: "asc" }, take: 1 },
+      modules: { select: { lessons: { select: { id: true }, take: 1 } } },
     },
   });
   if (
     !product ||
     !product.isActive ||
-    product.type !== "DIGITAL" ||
     !product.creatorProfile.isPublished ||
-    product.assets.length === 0 || // منتج رقميّ بلا ملف = غير قابل للتسليم
     product.price <= 0 ||
     !isSupportedCurrency(product.currency)
   ) {
     return null;
   }
+
+  // تحقّق خاصّ بالنوع.
+  if (product.type === "DIGITAL" && product.assets.length === 0) return null;
+  if (
+    product.type === "COURSE" &&
+    !product.modules.some((m) => m.lessons.length > 0)
+  ) {
+    return null;
+  }
+  if (product.type === "PHYSICAL" && product.stock !== null && product.stock <= 0) {
+    return null; // نفد المخزون
+  }
+
+  const shippingFee = product.type === "PHYSICAL" ? product.shippingFee ?? 0 : 0;
   return {
     product,
     creatorProfile: product.creatorProfile,
-    asset: product.assets[0],
+    asset: product.assets[0] ?? null,
     title: product.title,
     description: product.description ?? "",
-    amountMinor: product.price, // مُخزَّن أصلاً كأصغر وحدة
+    productPrice: product.price,
+    shippingFee,
+    amountMinor: product.price + shippingFee,
     currency: product.currency,
   };
 }
@@ -166,20 +192,53 @@ export async function createOrderForBlock(input: CreateOrderInput) {
   return { orderId: order.id, checkoutUrl: payment.checkoutUrl };
 }
 
+export interface ShippingInput {
+  fullName: string;
+  phone: string;
+  country: string;
+  city: string;
+  line: string;
+  postalCode?: string;
+}
+
 export interface CreateProductOrderInput {
   productId: string;
   buyerName: string;
   buyerEmail: string;
+  shipping?: ShippingInput;
 }
 
-// ينشئ طلب منتج PENDING بسعر القاعدة ويبدأ الدفع عبر المزوّد.
+function cleanShipping(raw: ShippingInput | undefined): {
+  fullName: string;
+  phone: string;
+  country: string;
+  city: string;
+  line: string;
+  postalCode: string | null;
+} {
+  const fullName = (raw?.fullName ?? "").trim().slice(0, 120);
+  const phone = (raw?.phone ?? "").trim().slice(0, 40);
+  const country = (raw?.country ?? "").trim().slice(0, 80);
+  const city = (raw?.city ?? "").trim().slice(0, 80);
+  const line = (raw?.line ?? "").trim().slice(0, 240);
+  const postalCode = (raw?.postalCode ?? "").trim().slice(0, 20) || null;
+  if (!fullName || !phone || !country || !city || !line) {
+    throw new CheckoutError("عنوان الشحن ناقص — أكمل كلّ الحقول المطلوبة.");
+  }
+  return { fullName, phone, country, city, line, postalCode };
+}
+
+// ينشئ طلب منتج PENDING بسعر القاعدة (يشمل الشحن للفيزيائيّ) ويبدأ الدفع.
 export async function createOrderForProduct(input: CreateProductOrderInput) {
   const purchasable = await loadPurchasableProduct(input.productId);
   if (!purchasable) {
     throw new CheckoutError("هذا المنتج غير متاح للشراء.");
   }
-
+  const type = purchasable.product.type as ProductType;
   const { buyerName, buyerEmail } = cleanBuyer(input.buyerName, input.buyerEmail);
+
+  // الفيزيائيّ يتطلّب عنوان شحن مكتملاً.
+  const shipping = type === "PHYSICAL" ? cleanShipping(input.shipping) : null;
 
   const order = await prisma.order.create({
     data: {
@@ -187,11 +246,22 @@ export async function createOrderForProduct(input: CreateProductOrderInput) {
       buyerName,
       buyerEmail,
       productId: purchasable.product.id,
-      amount: purchasable.amountMinor, // من القاعدة — لا من العميل
+      amount: purchasable.amountMinor, // سعر القاعدة (+ الشحن) — لا من العميل
       currency: purchasable.currency,
       status: "PENDING",
       provider: getPaymentProvider().id,
-      metadata: { title: purchasable.title, kind: "product" },
+      ...(type === "PHYSICAL"
+        ? {
+            fulfillmentStatus: "PENDING" as const,
+            shippingFee: purchasable.shippingFee,
+            shippingAddress: shipping ? { create: shipping } : undefined,
+          }
+        : {}),
+      metadata: {
+        title: purchasable.title,
+        kind: "product",
+        productType: type,
+      },
     },
     select: { id: true },
   });
@@ -213,26 +283,16 @@ export async function createOrderForProduct(input: CreateProductOrderInput) {
   return { orderId: order.id, checkoutUrl: payment.checkoutUrl };
 }
 
-// تسليم منتج رقميّ: توليد DownloadToken آمن (مرّة واحدة لكل طلب) + بريد المشتري والمبدع.
-async function deliverDigitalProduct(order: {
-  id: string;
-  productId: string | null;
-  buyerName: string;
-  buyerEmail: string;
-  amount: number;
-  currency: string;
-  creatorProfile: { displayName: string; user: { email: string } | null };
-}) {
+// ── تسليم رقميّ: توكن تحميل آمن + بريد ────────────────────────────────
+async function deliverDigitalProduct(order: DeliverOrder) {
   if (!order.productId) return;
-
   const product = await prisma.product.findUnique({
     where: { id: order.productId },
     include: { assets: { orderBy: { createdAt: "asc" }, take: 1 } },
   });
   const asset = product?.assets[0];
-  if (!product || !asset) return; // لا ملف → لا شيء يُسلَّم (نادر: حُذف بعد الطلب)
+  if (!product || !asset) return;
 
-  // idempotency إضافيّة: لا توكن مكرّر لنفس الطلب (فوق حارس PENDING).
   const existing = await prisma.downloadToken.findFirst({
     where: { orderId: order.id },
     select: { id: true },
@@ -276,6 +336,115 @@ async function deliverDigitalProduct(order: {
   }
 }
 
+// ── تسجيل الكورس: Enrollment برابط وصول آمن + بريد ────────────────────
+async function enrollCourseBuyer(order: DeliverOrder) {
+  if (!order.productId) return;
+  const product = await prisma.product.findUnique({
+    where: { id: order.productId },
+    select: { id: true, title: true },
+  });
+  if (!product) return;
+
+  const existing = await prisma.courseEnrollment.findUnique({
+    where: { orderId: order.id },
+    select: { id: true },
+  });
+  if (existing) return;
+
+  const rawToken = generateToken();
+  await prisma.courseEnrollment.create({
+    data: {
+      orderId: order.id,
+      productId: product.id,
+      buyerEmail: order.buyerEmail,
+      tokenHash: hashToken(rawToken),
+    },
+  });
+
+  const amountLabel = formatMoney(order.amount, order.currency);
+  await sendCourseAccessEmail(
+    {
+      buyerName: order.buyerName,
+      buyerEmail: order.buyerEmail,
+      courseTitle: product.title,
+      amountLabel,
+      creatorName: order.creatorProfile.displayName,
+    },
+    rawToken,
+  );
+  const creatorEmail = order.creatorProfile.user?.email;
+  if (creatorEmail) {
+    await sendCourseSaleNotification(creatorEmail, {
+      creatorName: order.creatorProfile.displayName,
+      courseTitle: product.title,
+      buyerName: order.buyerName,
+      buyerEmail: order.buyerEmail,
+      amountLabel,
+    });
+  }
+}
+
+// ── تنفيذ الفيزيائيّ: خصم المخزون + بريد تأكيد ورابط متابعة ──────────
+async function fulfillPhysicalOrder(order: DeliverOrder) {
+  if (!order.productId) return;
+  const product = await prisma.product.findUnique({
+    where: { id: order.productId },
+    select: { id: true, title: true, stock: true },
+  });
+  if (!product) return;
+
+  // خصم المخزون ذرّيّاً (إن كان محدوداً) — لا ينزل تحت الصفر.
+  if (product.stock !== null) {
+    await prisma.product.updateMany({
+      where: { id: product.id, stock: { gt: 0 } },
+      data: { stock: { decrement: 1 } },
+    });
+  }
+
+  const amountLabel = formatMoney(order.amount, order.currency);
+  await sendPhysicalOrderConfirmation({
+    orderId: order.id,
+    buyerName: order.buyerName,
+    buyerEmail: order.buyerEmail,
+    productTitle: product.title,
+    amountLabel,
+    creatorName: order.creatorProfile.displayName,
+  });
+  const creatorEmail = order.creatorProfile.user?.email;
+  if (creatorEmail) {
+    const addr = await prisma.shippingAddress.findUnique({
+      where: { orderId: order.id },
+    });
+    await sendPhysicalSaleNotification(creatorEmail, {
+      creatorName: order.creatorProfile.displayName,
+      productTitle: product.title,
+      buyerName: order.buyerName,
+      buyerEmail: order.buyerEmail,
+      amountLabel,
+      shipping: addr
+        ? {
+            fullName: addr.fullName,
+            phone: addr.phone,
+            country: addr.country,
+            city: addr.city,
+            line: addr.line,
+            postalCode: addr.postalCode,
+          }
+        : null,
+    });
+  }
+}
+
+interface DeliverOrder {
+  id: string;
+  productId: string | null;
+  buyerName: string;
+  buyerEmail: string;
+  amount: number;
+  currency: string;
+  creatorProfile: { displayName: string; user: { email: string } | null };
+}
+
 // معالجة حدث دفع موحّد — idempotent (لا ينتقل إلا من PENDING مرّة واحدة).
 export async function processPaymentEvent(
   event: NormalizedEvent,
@@ -283,6 +452,7 @@ export async function processPaymentEvent(
   const order = await prisma.order.findUnique({
     where: { providerRef: event.providerRef },
     include: {
+      product: { select: { type: true } },
       creatorProfile: {
         select: { displayName: true, user: { select: { email: true } } },
       },
@@ -309,9 +479,12 @@ export async function processPaymentEvent(
     data: { status: "PAID" },
   });
 
-  // مسار المنتج الرقميّ: تسليم رابط تحميل آمن.
+  // مسار المنتج: يتفرّع حسب النوع (تسليم مختلف فوق نفس الطلب الموحّد).
   if (order.productId) {
-    await deliverDigitalProduct(order);
+    const type = order.product?.type;
+    if (type === "COURSE") await enrollCourseBuyer(order);
+    else if (type === "PHYSICAL") await fulfillPhysicalOrder(order);
+    else await deliverDigitalProduct(order);
     return { handled: true };
   }
 

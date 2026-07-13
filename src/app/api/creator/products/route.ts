@@ -31,7 +31,7 @@ export async function GET() {
         take: 1,
         select: { fileName: true, size: true },
       },
-      _count: { select: { orders: true } },
+      _count: { select: { orders: true, modules: true } },
     },
   });
 
@@ -46,9 +46,12 @@ export async function GET() {
       currency: p.currency,
       images: p.images,
       isActive: p.isActive,
+      stock: p.stock,
+      shippingFee: p.shippingFee,
       file: p.assets[0]
         ? { fileName: p.assets[0].fileName, size: p.assets[0].size }
         : null,
+      moduleCount: p._count.modules,
       orderCount: p._count.orders,
     })),
   });
@@ -92,6 +95,8 @@ export async function POST(req: NextRequest) {
       currency: clean.currency,
       images: clean.images as object,
       isActive: clean.isActive,
+      stock: clean.stock,
+      shippingFee: clean.shippingFee,
       ...(clean.asset
         ? {
             assets: {

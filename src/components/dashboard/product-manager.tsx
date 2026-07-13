@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import Link from "next/link";
 import {
   Plus,
   Pencil,
@@ -9,45 +10,65 @@ import {
   FileText,
   Loader2,
   ArrowRight,
+  Download,
+  GraduationCap,
+  Package,
+  ListTree,
 } from "lucide-react";
 import { Field, TextInput } from "@/components/dashboard/field";
 import { ImageUpload } from "@/components/dashboard/image-upload";
 import { formatMoney } from "@/lib/payments/money";
 
+type Kind = "DIGITAL" | "COURSE" | "PHYSICAL";
+
+const KIND_META: Record<Kind, { label: string; Icon: typeof Download }> = {
+  DIGITAL: { label: "منتج رقميّ", Icon: Download },
+  COURSE: { label: "كورس", Icon: GraduationCap },
+  PHYSICAL: { label: "منتج فيزيائيّ", Icon: Package },
+};
+
 export interface DashProduct {
   id: string;
+  type: Kind;
   title: string;
   description: string | null;
-  price: number; // minor units
+  price: number; // minor
   currency: string;
   images: unknown;
   isActive: boolean;
+  stock: number | null;
+  shippingFee: number | null; // minor
   file: { fileName: string; size: number } | null;
+  moduleCount: number;
   orderCount: number;
 }
 
 interface FormState {
   id: string | null;
+  type: Kind;
   title: string;
   description: string;
   priceMajor: string;
   currency: string;
   image: string;
   isActive: boolean;
-  // ملف جديد مرفوع لهذه الجلسة (اختياريّ عند التعديل)
+  stock: string;
+  shippingFeeMajor: string;
   file: { fileKey: string; fileName: string; size: number } | null;
-  // اسم ملف قائم (عند التعديل) للعرض فقط
   existingFileName: string | null;
 }
 
 const empty: FormState = {
   id: null,
+  type: "DIGITAL",
   title: "",
   description: "",
   priceMajor: "",
   currency: "USD",
   image: "",
   isActive: true,
+  stock: "",
+  shippingFeeMajor: "",
   file: null,
   existingFileName: null,
 };
@@ -57,7 +78,6 @@ function fmtSize(bytes: number): string {
   if (bytes >= 1024) return `${Math.round(bytes / 1024)}KB`;
   return `${bytes}B`;
 }
-
 function firstImage(images: unknown): string {
   return Array.isArray(images) && typeof images[0] === "string" ? images[0] : "";
 }
@@ -78,12 +98,15 @@ export function ProductManager({ initial }: { initial: DashProduct[] }) {
     setError(null);
     setForm({
       id: p.id,
+      type: p.type,
       title: p.title,
       description: p.description ?? "",
-      priceMajor: String(p.price / 100), // minor→major (USD/TRY factor=100)
+      priceMajor: String(p.price / 100),
       currency: p.currency,
       image: firstImage(p.images),
       isActive: p.isActive,
+      stock: p.stock === null ? "" : String(p.stock),
+      shippingFeeMajor: p.shippingFee ? String(p.shippingFee / 100) : "",
       file: null,
       existingFileName: p.file?.fileName ?? null,
     });
@@ -107,14 +130,12 @@ export function ProductManager({ initial }: { initial: DashProduct[] }) {
         body: fd,
       });
       const d = await res.json();
-      if (!d.ok) {
-        setError(d.error || "تعذّر رفع الملف.");
-      } else {
+      if (!d.ok) setError(d.error || "تعذّر رفع الملف.");
+      else
         setForm({
           ...form,
           file: { fileKey: d.fileKey, fileName: d.fileName, size: d.size },
         });
-      }
     } catch {
       setError("تعذّر رفع الملف.");
     } finally {
@@ -128,20 +149,27 @@ export function ProductManager({ initial }: { initial: DashProduct[] }) {
     if (!form.title.trim()) return setError("عنوان المنتج مطلوب.");
     if (!form.priceMajor || Number(form.priceMajor) <= 0)
       return setError("السعر يجب أن يكون أكبر من صفر.");
-    if (!form.id && !form.file)
+    if (form.type === "DIGITAL" && !form.id && !form.file)
       return setError("ارفع ملف المنتج الرقميّ.");
 
     setBusy(true);
     setError(null);
-    const payload = {
+    const payload: Record<string, unknown> = {
+      type: form.type,
       title: form.title,
       description: form.description,
       price: Number(form.priceMajor),
       currency: form.currency,
       images: form.image ? [form.image] : [],
       isActive: form.isActive,
-      ...(form.file ? { file: form.file } : {}),
     };
+    if (form.type === "DIGITAL" && form.file) payload.file = form.file;
+    if (form.type === "PHYSICAL") {
+      if (form.stock !== "") payload.stock = Number(form.stock);
+      if (form.shippingFeeMajor !== "")
+        payload.shippingFee = Number(form.shippingFeeMajor);
+    }
+
     const res = await fetch(
       form.id ? `/api/creator/products/${form.id}` : "/api/creator/products",
       {
@@ -153,6 +181,11 @@ export function ProductManager({ initial }: { initial: DashProduct[] }) {
     const d = await res.json().catch(() => ({ ok: false }));
     setBusy(false);
     if (!d.ok) return setError(d.error || "تعذّر الحفظ.");
+    // إنشاء كورس جديد → انتقل لإدارة المحتوى مباشرةً.
+    if (!form.id && form.type === "COURSE" && d.id) {
+      window.location.href = `/dashboard/products/${d.id}/course`;
+      return;
+    }
     setForm(null);
     await refresh();
   };
@@ -168,6 +201,9 @@ export function ProductManager({ initial }: { initial: DashProduct[] }) {
 
   // ── نموذج الإنشاء/التعديل ──────────────────────────────────────────
   if (form) {
+    const isDigital = form.type === "DIGITAL";
+    const isPhysical = form.type === "PHYSICAL";
+    const isCourse = form.type === "COURSE";
     return (
       <div className="mx-auto w-full max-w-lg">
         <button
@@ -178,15 +214,48 @@ export function ProductManager({ initial }: { initial: DashProduct[] }) {
           <ArrowRight className="size-4" /> رجوع
         </button>
         <h2 className="mb-4 text-lg font-bold text-foreground">
-          {form.id ? "تعديل منتج" : "منتج رقميّ جديد"}
+          {form.id ? "تعديل منتج" : "منتج جديد"}
         </h2>
 
         <div className="space-y-4 rounded-2xl border border-border bg-card p-5">
-          <Field label="عنوان المنتج">
+          {/* اختيار النوع — عند الإنشاء فقط (ثابت بعد ذلك) */}
+          {!form.id ? (
+            <Field label="النوع">
+              <div className="grid grid-cols-3 gap-2">
+                {(Object.keys(KIND_META) as Kind[]).map((k) => {
+                  const M = KIND_META[k];
+                  const on = form.type === k;
+                  return (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => setForm({ ...form, type: k })}
+                      className={`flex flex-col items-center gap-1 rounded-xl border p-3 text-xs font-medium transition-colors ${
+                        on
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border text-foreground hover:bg-muted"
+                      }`}
+                    >
+                      <M.Icon className="size-5" />
+                      {M.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </Field>
+          ) : (
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
+              {KIND_META[form.type].label}
+            </div>
+          )}
+
+          <Field label="العنوان">
             <TextInput
               value={form.title}
               onChange={(v) => setForm({ ...form, title: v })}
-              placeholder="مثال: كتيّب العناية بالبشرة (PDF)"
+              placeholder={
+                isCourse ? "مثال: كورس المكياج الاحترافيّ" : "اسم المنتج"
+              }
             />
           </Field>
 
@@ -223,6 +292,28 @@ export function ProductManager({ initial }: { initial: DashProduct[] }) {
             </div>
           </div>
 
+          {/* الفيزيائيّ: مخزون + رسوم شحن */}
+          {isPhysical ? (
+            <div className="flex gap-2">
+              <Field label="المخزون (اتركه فارغاً = غير محدود)">
+                <TextInput
+                  type="number"
+                  value={form.stock}
+                  onChange={(v) => setForm({ ...form, stock: v })}
+                  placeholder="∞"
+                />
+              </Field>
+              <Field label="رسوم الشحن (اختياري)">
+                <TextInput
+                  type="number"
+                  value={form.shippingFeeMajor}
+                  onChange={(v) => setForm({ ...form, shippingFeeMajor: v })}
+                  placeholder="0"
+                />
+              </Field>
+            </div>
+          ) : null}
+
           <Field label="صورة الغلاف (اختياري)">
             <ImageUpload
               value={form.image}
@@ -231,44 +322,51 @@ export function ProductManager({ initial }: { initial: DashProduct[] }) {
             />
           </Field>
 
-          <div>
-            <span className="mb-1 block text-sm font-medium text-foreground">
-              ملف المنتج الرقميّ {form.id ? "(اترك فارغاً للإبقاء على الحاليّ)" : ""}
-            </span>
-            <input
-              ref={fileRef}
-              type="file"
-              onChange={handleFile}
-              className="hidden"
-            />
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              disabled={uploading}
-              className="inline-flex items-center gap-2 rounded-lg border border-input bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-60"
-            >
-              {uploading ? (
-                <Loader2 className="size-4 animate-spin" />
+          {/* الرقميّ: ملف خاصّ */}
+          {isDigital ? (
+            <div>
+              <span className="mb-1 block text-sm font-medium text-foreground">
+                ملف المنتج الرقميّ {form.id ? "(اتركه فارغاً للإبقاء على الحاليّ)" : ""}
+              </span>
+              <input ref={fileRef} type="file" onChange={handleFile} className="hidden" />
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                disabled={uploading}
+                className="inline-flex items-center gap-2 rounded-lg border border-input bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-60"
+              >
+                {uploading ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Upload className="size-4" />
+                )}
+                {uploading ? "جارٍ الرفع…" : "رفع ملف"}
+              </button>
+              {form.file ? (
+                <p className="mt-2 flex items-center gap-1.5 text-xs text-primary">
+                  <FileText className="size-3.5" /> {form.file.fileName} ·{" "}
+                  {fmtSize(form.file.size)} (جديد)
+                </p>
+              ) : form.existingFileName ? (
+                <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <FileText className="size-3.5" /> {form.existingFileName} (الحاليّ)
+                </p>
               ) : (
-                <Upload className="size-4" />
+                <p className="mt-2 text-xs text-muted-foreground">
+                  لا يُخدَم الملف علناً — يُسلَّم فقط برابط آمن بعد الدفع.
+                </p>
               )}
-              {uploading ? "جارٍ الرفع…" : "رفع ملف"}
-            </button>
-            {form.file ? (
-              <p className="mt-2 flex items-center gap-1.5 text-xs text-primary">
-                <FileText className="size-3.5" /> {form.file.fileName} ·{" "}
-                {fmtSize(form.file.size)} (جديد)
-              </p>
-            ) : form.existingFileName ? (
-              <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
-                <FileText className="size-3.5" /> {form.existingFileName} (الحاليّ)
-              </p>
-            ) : (
-              <p className="mt-2 text-xs text-muted-foreground">
-                لا يُخدَم الملف علناً — يُسلَّم فقط برابط آمن بعد الدفع.
-              </p>
-            )}
-          </div>
+            </div>
+          ) : null}
+
+          {/* الكورس: تلميح المحتوى */}
+          {isCourse ? (
+            <p className="rounded-lg border border-dashed border-border bg-muted/30 p-3 text-xs text-muted-foreground">
+              {form.id
+                ? "أضِف الوحدات والدروس من زرّ «إدارة المحتوى» في بطاقة الكورس."
+                : "بعد الحفظ ستنتقل لإضافة الوحدات والدروس (فيديو/نصّ/ملف)."}
+            </p>
+          ) : null}
 
           <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
             <input
@@ -294,7 +392,7 @@ export function ProductManager({ initial }: { initial: DashProduct[] }) {
               className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
             >
               {busy ? <Loader2 className="size-4 animate-spin" /> : null}
-              حفظ
+              {!form.id && isCourse ? "حفظ ومتابعة المحتوى" : "حفظ"}
             </button>
             <button
               type="button"
@@ -313,7 +411,7 @@ export function ProductManager({ initial }: { initial: DashProduct[] }) {
   return (
     <div className="w-full">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-lg font-bold text-foreground">المنتجات الرقميّة</h1>
+        <h1 className="text-lg font-bold text-foreground">منتجات المتجر</h1>
         <button
           type="button"
           onClick={openCreate}
@@ -325,24 +423,28 @@ export function ProductManager({ initial }: { initial: DashProduct[] }) {
 
       {products.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border py-16 text-center text-sm text-muted-foreground">
-          لا منتجات بعد. أنشئ أوّل منتج رقميّ للبيع في متجرك.
+          لا منتجات بعد. أنشئ منتجاً رقميّاً أو كورساً أو منتجاً فيزيائيّاً.
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {products.map((p) => {
             const img = firstImage(p.images);
+            const M = KIND_META[p.type];
             return (
               <div
                 key={p.id}
                 className="flex flex-col overflow-hidden rounded-2xl border border-border bg-card"
               >
-                <div className="aspect-video w-full overflow-hidden bg-muted">
+                <div className="relative aspect-video w-full overflow-hidden bg-muted">
+                  <span className="absolute end-2 top-2 z-10 inline-flex items-center gap-1 rounded-full bg-background/90 px-2 py-0.5 text-[10px] font-medium text-foreground">
+                    <M.Icon className="size-3" /> {M.label}
+                  </span>
                   {img ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={img} alt={p.title} className="size-full object-cover" />
                   ) : (
                     <div className="flex size-full items-center justify-center text-muted-foreground">
-                      <FileText className="size-8" />
+                      <M.Icon className="size-8" />
                     </div>
                   )}
                 </div>
@@ -363,22 +465,57 @@ export function ProductManager({ initial }: { initial: DashProduct[] }) {
                   </div>
                   <p className="text-sm font-bold text-primary">
                     {formatMoney(p.price, p.currency)}
-                  </p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {p.file ? (
-                      <span className="inline-flex items-center gap-1">
-                        <FileText className="size-3" /> {p.file.fileName}
+                    {p.type === "PHYSICAL" && p.shippingFee ? (
+                      <span className="text-xs font-normal text-muted-foreground">
+                        {" "}
+                        + شحن {formatMoney(p.shippingFee, p.currency)}
                       </span>
+                    ) : null}
+                  </p>
+
+                  {/* سطر خاصّ بالنوع */}
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {p.type === "DIGITAL" ? (
+                      p.file ? (
+                        <span className="inline-flex items-center gap-1">
+                          <FileText className="size-3" /> {p.file.fileName}
+                        </span>
+                      ) : (
+                        <span className="text-amber-600 dark:text-amber-400">
+                          بلا ملف — لن يُباع
+                        </span>
+                      )
+                    ) : p.type === "COURSE" ? (
+                      p.moduleCount > 0 ? (
+                        <span>{p.moduleCount} وحدات</span>
+                      ) : (
+                        <span className="text-amber-600 dark:text-amber-400">
+                          بلا محتوى — لن يُباع
+                        </span>
+                      )
+                    ) : p.stock === null ? (
+                      <span>مخزون غير محدود</span>
+                    ) : p.stock > 0 ? (
+                      <span>المخزون: {p.stock}</span>
                     ) : (
                       <span className="text-amber-600 dark:text-amber-400">
-                        بلا ملف — لن يُباع
+                        نفد المخزون
                       </span>
                     )}
                   </p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
                     مبيعات: {p.orderCount}
                   </p>
+
                   <div className="mt-3 flex gap-1.5">
+                    {p.type === "COURSE" ? (
+                      <Link
+                        href={`/dashboard/products/${p.id}/course`}
+                        className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg border border-border px-2 py-1.5 text-xs font-medium text-foreground hover:bg-muted"
+                      >
+                        <ListTree className="size-3.5" /> المحتوى
+                      </Link>
+                    ) : null}
                     <button
                       type="button"
                       onClick={() => openEdit(p)}

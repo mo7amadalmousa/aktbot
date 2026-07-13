@@ -56,18 +56,34 @@ export default async function PublicPage({
       if (s) storeIds.add(s);
     }
   }
-  const storeProducts = storeIds.size
+  const storeRows = storeIds.size
     ? await prisma.product.findMany({
         where: {
           id: { in: [...storeIds] },
           creatorProfileId: profile.id,
           isActive: true,
-          type: "DIGITAL",
-          assets: { some: {} },
         },
-        select: { id: true, title: true, price: true, currency: true, images: true },
+        select: {
+          id: true,
+          type: true,
+          title: true,
+          price: true,
+          shippingFee: true,
+          stock: true,
+          currency: true,
+          images: true,
+          _count: { select: { assets: true } },
+          modules: { select: { _count: { select: { lessons: true } } } },
+        },
       })
     : [];
+  // أظهر فقط القابل للشراء فعلاً حسب النوع (له ملف/درس/مخزون).
+  const storeProducts = storeRows.filter((p) => {
+    if (p.type === "DIGITAL") return p._count.assets > 0;
+    if (p.type === "COURSE") return p.modules.some((m) => m._count.lessons > 0);
+    if (p.type === "PHYSICAL") return p.stock === null || p.stock > 0;
+    return false;
+  });
   const productMap = new Map(storeProducts.map((p) => [p.id, p]));
 
   // فلترة خادميّة: أخفِ ستوري TIME_24H المنتهية.
@@ -99,8 +115,9 @@ export default async function PublicPage({
           .filter((p): p is NonNullable<typeof p> => Boolean(p))
           .map((p) => ({
             id: p.id,
+            type: p.type,
             title: p.title,
-            price: p.price, // minor units — سعر القاعدة
+            price: p.price, // minor units — سعر القاعدة (بلا الشحن)
             currency: p.currency,
             image: str((arr(p.images).map((u) => str(u)))[0]),
           }));
