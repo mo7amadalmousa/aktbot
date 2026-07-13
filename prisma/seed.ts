@@ -466,6 +466,68 @@ async function main() {
 
   const linaProduct = await seedLinaDigitalProduct(lina.profileId, lina.pageId);
 
+  // ── مستخدم إشراف (ADMIN) — لا ملف مبدع، دور منصّة ─────────────────────
+  const adminHash = await bcrypt.hash("Demo!2026", 12);
+  await prisma.user.upsert({
+    where: { email: "admin@demo.aktbot.local" },
+    update: { role: "ADMIN", emailVerified: true },
+    create: {
+      email: "admin@demo.aktbot.local",
+      passwordHash: adminHash,
+      role: "ADMIN",
+      emailVerified: true,
+    },
+  });
+
+  // ── بيانات تحليلات تجريبيّة (عدّادات مجمّعة) — آخر 14 يوماً ────────────
+  const seedAnalytics = async (profileId: string, base: number) => {
+    for (let i = 0; i < 14; i++) {
+      const date = new Date(Date.now() - i * 86400000)
+        .toISOString()
+        .slice(0, 10);
+      const views = base + (13 - i) * 2 + (i % 3);
+      const uniques = Math.round(views * 0.6);
+      const srcDirect = Math.round(views * 0.5);
+      const srcSocial = Math.round(views * 0.35);
+      const srcOther = views - srcDirect - srcSocial;
+      await prisma.pageViewDaily.upsert({
+        where: { creatorProfileId_date: { creatorProfileId: profileId, date } },
+        update: { views, uniques, srcDirect, srcSocial, srcOther },
+        create: {
+          creatorProfileId: profileId,
+          date,
+          views,
+          uniques,
+          srcDirect,
+          srcSocial,
+          srcOther,
+        },
+      });
+    }
+  };
+  await seedAnalytics(lina.profileId, 22);
+  await seedAnalytics(sara.profileId, 9);
+
+  // نقرات بلوكات لينا (أعلى بلوكين).
+  const linaBlocks = await prisma.block.findMany({
+    where: { page: { creatorProfileId: lina.profileId } },
+    orderBy: { order: "asc" },
+    take: 3,
+    select: { id: true },
+  });
+  const clickCounts = [140, 76, 41];
+  for (let i = 0; i < linaBlocks.length; i++) {
+    await prisma.blockClick.upsert({
+      where: { blockId: linaBlocks[i].id },
+      update: { count: clickCounts[i] },
+      create: {
+        blockId: linaBlocks[i].id,
+        creatorProfileId: lina.profileId,
+        count: clickCounts[i],
+      },
+    });
+  }
+
   // توفّر لينا للحجز: أحد–خميس 10:00–17:00 (إسطنبول)، جلسة 30د، أفق 21 يوماً.
   const linaWeekly = [0, 1, 2, 3, 4].map((day) => ({
     day,

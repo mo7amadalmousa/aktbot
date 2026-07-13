@@ -26,12 +26,17 @@ function zoneForHost(host: string): Zone {
 }
 
 // مسارات منطقة app التي تتطلّب جلسة صالحة.
-const APP_PROTECTED_PREFIXES = ["/dashboard"];
+const APP_PROTECTED_PREFIXES = ["/dashboard", "/admin"];
 
 function needsAuth(pathname: string): boolean {
   return APP_PROTECTED_PREFIXES.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`),
   );
+}
+
+// مسارات لوحة الإشراف — دور ADMIN حصراً.
+function isAdminPath(pathname: string): boolean {
+  return pathname === "/admin" || pathname.startsWith("/admin/");
 }
 
 export async function proxy(req: NextRequest) {
@@ -65,6 +70,13 @@ export async function proxy(req: NextRequest) {
       url.pathname = "/login";
       url.search = "";
       url.searchParams.set("next", pathname);
+      return NextResponse.redirect(url);
+    }
+    // لوحة الإشراف: دور ADMIN فقط — غيرهم يُحوَّل للداشبورد.
+    if (isAdminPath(pathname) && session.role !== "ADMIN") {
+      const url = req.nextUrl.clone();
+      url.pathname = "/dashboard";
+      url.search = "";
       return NextResponse.redirect(url);
     }
   }

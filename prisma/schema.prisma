@@ -119,6 +119,8 @@ model CreatorProfile {
   products     Product[]
   availability Availability?
   bookings     Booking[]
+  pageViews    PageViewDaily[]
+  blockClicks  BlockClick[]
 }
 
 // مشتركو النشرة البريديّة لكل مبدع (جمع فقط الآن؛ إرسال الحملات لاحقاً).
@@ -421,4 +423,51 @@ model Booking {
   @@index([creatorProfileId])
   @@index([consultationBlockId])
   @@index([status])
+}
+
+// ── التحليلات (تتبّع مجمّع خفيف — مبنيّ للمقياس) ───────────────────────
+// قرار: عدّاد يوميّ مجمّع (صفّ لكل مبدع/يوم) لا صفّ لكل زيارة — يتحمّل ملايين
+// الزيارات. الفريد اليوميّ يُدَّوب عبر VisitorDay (صفّ لكل زائر فريد/يوم، أصغر
+// بكثير من عدد الزيارات). لا PII — معرّف الزائر مجهول (aktbot_vid).
+model PageViewDaily {
+  id               String   @id @default(cuid())
+  creatorProfileId String
+  date             String // YYYY-MM-DD (UTC)
+  views            Int      @default(0)
+  uniques          Int      @default(0)
+  srcDirect        Int      @default(0)
+  srcSocial        Int      @default(0)
+  srcOther         Int      @default(0)
+  updatedAt        DateTime @updatedAt
+
+  creatorProfile CreatorProfile @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([creatorProfileId, date])
+  @@index([creatorProfileId])
+  @@index([date])
+}
+
+// دِدوب الزائر الفريد يوميّاً (لا يُخزَّن أيّ حدث زيارة فرديّ). idempotent عبر القيد.
+model VisitorDay {
+  id               String   @id @default(cuid())
+  creatorProfileId String
+  visitorId        String
+  date             String
+  createdAt        DateTime @default(now())
+
+  @@unique([creatorProfileId, visitorId, date])
+  @@index([creatorProfileId, date])
+}
+
+// نقرات البلوك — مجمّع (صفّ لكل بلوك). نفس فلسفة CouponCounter.
+model BlockClick {
+  id               String   @id @default(cuid())
+  blockId          String   @unique
+  creatorProfileId String
+  count            Int      @default(0)
+  updatedAt        DateTime @updatedAt
+
+  creatorProfile CreatorProfile @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
+
+  @@index([creatorProfileId])
 }

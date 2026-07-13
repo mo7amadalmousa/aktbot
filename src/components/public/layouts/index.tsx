@@ -148,7 +148,9 @@ const Ink: LayoutDef = {
   Blocks: (p) => (
     <div className="mt-7 space-y-3">
       {p.blocks.map((b) => (
-        <div key={b.id}>{renderOne(b, p)}</div>
+        <div key={b.id} data-block-id={b.id}>
+          {renderOne(b, p)}
+        </div>
       ))}
     </div>
   ),
@@ -177,7 +179,11 @@ const Tentacles: LayoutDef = {
   Blocks: (p) => (
     <div className="mt-5 grid grid-cols-2 gap-2.5">
       {p.blocks.map((b) => (
-        <div key={b.id} className={cn(!HALF_WIDTH.has(b.type) && "col-span-2")}>
+        <div
+          key={b.id}
+          data-block-id={b.id}
+          className={cn(!HALF_WIDTH.has(b.type) && "col-span-2")}
+        >
           {renderOne(b, p)}
         </div>
       ))}
@@ -229,7 +235,9 @@ const Reef: LayoutDef = {
   Blocks: (p) => (
     <div className="space-y-3">
       {p.blocks.map((b) => (
-        <div key={b.id}>{renderOne(b, p)}</div>
+        <div key={b.id} data-block-id={b.id}>
+          {renderOne(b, p)}
+        </div>
       ))}
     </div>
   ),
@@ -241,7 +249,9 @@ const Coral: LayoutDef = {
   Blocks: (p) => (
     <div className="mt-6 space-y-3">
       {p.blocks.map((b) => (
-        <div key={b.id}>{renderOne(b, p)}</div>
+        <div key={b.id} data-block-id={b.id}>
+          {renderOne(b, p)}
+        </div>
       ))}
     </div>
   ),
