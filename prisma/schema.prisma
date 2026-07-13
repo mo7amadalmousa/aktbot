@@ -209,12 +209,18 @@ model Order {
   provider         String      @default("mock")
   providerRef      String?     @unique // مرجع المزوّد — يضمن idempotency للـwebhook
   metadata         Json?
+  // حقول الشحن (المنتج الفيزيائيّ) — additive، تبقى null لغير الفيزيائيّ.
+  fulfillmentStatus FulfillmentStatus?
+  trackingNumber    String?
+  shippingFee       Int? // رسوم الشحن بأصغر وحدة (من القاعدة)
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 
-  creatorProfile CreatorProfile  @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
-  product        Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
-  downloadTokens DownloadToken[]
+  creatorProfile  CreatorProfile    @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
+  product         Product?          @relation(fields: [productId], references: [id], onDelete: SetNull)
+  downloadTokens  DownloadToken[]
+  enrollment      CourseEnrollment?
+  shippingAddress ShippingAddress?
 
   @@index([creatorProfileId])
   @@index([status])
@@ -237,12 +243,17 @@ model Product {
   currency         String
   images           Json? // روابط صور (عبر طبقة الرفع)
   isActive         Boolean     @default(true)
+  // الفيزيائيّ (additive): مخزون اختياريّ (null = غير محدود) + رسوم شحن اختياريّة.
+  stock            Int?
+  shippingFee      Int? // minor units
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 
-  creatorProfile CreatorProfile @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
+  creatorProfile CreatorProfile     @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
   assets         ProductAsset[]
   orders         Order[]
+  modules        CourseModule[] // بنية الكورس (type=COURSE)
+  enrollments    CourseEnrollment[]
 
   @@index([creatorProfileId])
 }
@@ -277,4 +288,80 @@ model DownloadToken {
   productAsset ProductAsset @relation(fields: [productAssetId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
+}
+
+// ── الكورس (type=COURSE): وحدات ← دروس، ووصول المشتري عبر Enrollment ──
+enum LessonType {
+  VIDEO // فيديو مرفوع (خاصّ) أو تضمين
+  TEXT // نصّ الدرس
+  FILE // ملف مرفق (خاصّ)
+}
+
+model CourseModule {
+  id        String   @id @default(cuid())
+  productId String
+  title     String
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  product Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  lessons CourseLesson[]
+
+  @@index([productId])
+}
+
+model CourseLesson {
+  id         String     @id @default(cuid())
+  moduleId   String
+  title      String
+  order      Int        @default(0)
+  type       LessonType @default(TEXT)
+  contentRef String? // نصّ الدرس (TEXT) أو رابط تضمين (VIDEO embed)
+  assetKey   String? // ملف/فيديو مرفوع في التخزين الخاصّ (VIDEO upload | FILE)
+  assetName  String?
+  duration   String?
+  createdAt  DateTime   @default(now())
+
+  module CourseModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@index([moduleId])
+}
+
+// وصول المشتري لمحتوى الكورس بعد الدفع — رابط غير قابل للتخمين (مجزّأ).
+model CourseEnrollment {
+  id               String   @id @default(cuid())
+  orderId          String   @unique
+  productId        String
+  buyerEmail       String
+  tokenHash        String   @unique
+  completedLessons Json? // تقدّم أساسيّ: معرّفات الدروس المكتملة
+  createdAt        DateTime @default(now())
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
+// ── الشحن (type=PHYSICAL) ─────────────────────────────────────────────
+enum FulfillmentStatus {
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+model ShippingAddress {
+  id         String   @id @default(cuid())
+  orderId    String   @unique
+  fullName   String
+  phone      String
+  country    String
+  city       String
+  line       String
+  postalCode String?
+  createdAt  DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 }

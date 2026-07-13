@@ -52,6 +52,7 @@ export async function PUT(
   }
 
   await prisma.$transaction(async (tx) => {
+    // النوع ثابت بعد الإنشاء (لا يتغيّر عند التعديل) — يحافظ على بنية الكورس/الشحن.
     await tx.product.update({
       where: { id: product.id },
       data: {
@@ -61,6 +62,8 @@ export async function PUT(
         currency: clean.currency,
         images: clean.images as object,
         isActive: clean.isActive,
+        stock: clean.stock,
+        shippingFee: clean.shippingFee,
       },
     });
     // ملف جديد → استبدل الأصل: احذف صفوف الأصول القديمة وأنشئ الجديد.

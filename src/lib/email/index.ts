@@ -199,3 +199,201 @@ export async function sendProductSaleNotification(
 <p style="color:#666">راجع مبيعاتك من لوحة التحكّم.<br/>— ${FROM}</p>`,
   });
 }
+
+// ── وصول الكورس (بعد نجاح الدفع) ──────────────────────────────────────
+interface CourseAccessData {
+  buyerName: string;
+  buyerEmail: string;
+  courseTitle: string;
+  amountLabel: string;
+  creatorName: string;
+}
+
+// رابط الوصول يُبنى من التوكن الخام — لا يُخزَّن خاماً (sha256 فقط).
+export async function sendCourseAccessEmail(
+  data: CourseAccessData,
+  rawToken: string,
+): Promise<void> {
+  const link = `${appUrl()}/learn/${rawToken}`;
+  await getEmailAdapter().send({
+    to: data.buyerEmail,
+    subject: `AktBot — وصولك لكورس «${data.courseTitle}»`,
+    text: [
+      `مرحباً ${data.buyerName}،`,
+      "",
+      `تمّ الدفع بنجاح لكورس «${data.courseTitle}» لدى ${data.creatorName}.`,
+      `المبلغ: ${data.amountLabel}`,
+      "",
+      "رابط الوصول الخاصّ بك (احتفظ به — لا تشاركه):",
+      link,
+      `— ${FROM}`,
+    ].join("\n"),
+    html: `<p>مرحباً ${data.buyerName}،</p>
+<p>تمّ الدفع بنجاح لكورس «<strong>${data.courseTitle}</strong>» لدى ${data.creatorName}.</p>
+<p>المبلغ: <strong>${data.amountLabel}</strong></p>
+<p>رابط الوصول الخاصّ بك (احتفظ به — لا تشاركه):</p>
+<p><a href="${link}">ابدأ الكورس</a></p>
+<p style="color:#666">— ${FROM}</p>`,
+  });
+}
+
+interface CourseSaleData {
+  creatorName: string;
+  courseTitle: string;
+  buyerName: string;
+  buyerEmail: string;
+  amountLabel: string;
+}
+
+export async function sendCourseSaleNotification(
+  creatorEmail: string,
+  data: CourseSaleData,
+): Promise<void> {
+  await getEmailAdapter().send({
+    to: creatorEmail,
+    subject: `AktBot — التحاق جديد بالكورس: ${data.courseTitle}`,
+    text: [
+      `مرحباً ${data.creatorName}،`,
+      "",
+      `التحق مشترٍ جديد بكورس «${data.courseTitle}».`,
+      `المشتري: ${data.buyerName} <${data.buyerEmail}>`,
+      `المبلغ: ${data.amountLabel}`,
+      `— ${FROM}`,
+    ].join("\n"),
+    html: `<p>مرحباً ${data.creatorName}،</p>
+<p>التحق مشترٍ جديد بكورس «<strong>${data.courseTitle}</strong>».</p>
+<p>المشتري: ${data.buyerName} &lt;${data.buyerEmail}&gt;<br/>المبلغ: <strong>${data.amountLabel}</strong></p>
+<p style="color:#666">— ${FROM}</p>`,
+  });
+}
+
+// ── المنتج الفيزيائيّ (بعد نجاح الدفع + تحديثات الشحن) ────────────────
+interface PhysicalConfirmData {
+  orderId: string;
+  buyerName: string;
+  buyerEmail: string;
+  productTitle: string;
+  amountLabel: string;
+  creatorName: string;
+}
+
+export async function sendPhysicalOrderConfirmation(
+  data: PhysicalConfirmData,
+): Promise<void> {
+  const track = `${appUrl()}/track/${data.orderId}?e=${encodeURIComponent(
+    data.buyerEmail,
+  )}`;
+  await getEmailAdapter().send({
+    to: data.buyerEmail,
+    subject: `AktBot — تأكيد طلبك: ${data.productTitle}`,
+    text: [
+      `مرحباً ${data.buyerName}،`,
+      "",
+      `تمّ الدفع بنجاح لطلب «${data.productTitle}» لدى ${data.creatorName}.`,
+      `المبلغ (شامل الشحن): ${data.amountLabel}`,
+      "",
+      "سيُجهّز المبدع طلبك ويشحنه. تابع حالة الشحن عبر:",
+      track,
+      `— ${FROM}`,
+    ].join("\n"),
+    html: `<p>مرحباً ${data.buyerName}،</p>
+<p>تمّ الدفع بنجاح لطلب «<strong>${data.productTitle}</strong>» لدى ${data.creatorName}.</p>
+<p>المبلغ (شامل الشحن): <strong>${data.amountLabel}</strong></p>
+<p>سيُجهّز المبدع طلبك ويشحنه. تابع حالة الشحن عبر:</p>
+<p><a href="${track}">متابعة الطلب</a></p>
+<p style="color:#666">— ${FROM}</p>`,
+  });
+}
+
+interface ShippingAddr {
+  fullName: string;
+  phone: string;
+  country: string;
+  city: string;
+  line: string;
+  postalCode: string | null;
+}
+
+interface PhysicalSaleData {
+  creatorName: string;
+  productTitle: string;
+  buyerName: string;
+  buyerEmail: string;
+  amountLabel: string;
+  shipping: ShippingAddr | null;
+}
+
+export async function sendPhysicalSaleNotification(
+  creatorEmail: string,
+  data: PhysicalSaleData,
+): Promise<void> {
+  const a = data.shipping;
+  const addrText = a
+    ? [
+        `المستلم: ${a.fullName} · ${a.phone}`,
+        `العنوان: ${a.line}، ${a.city}، ${a.country}${
+          a.postalCode ? ` (${a.postalCode})` : ""
+        }`,
+      ].join("\n")
+    : "";
+  await getEmailAdapter().send({
+    to: creatorEmail,
+    subject: `AktBot — طلب فيزيائيّ جديد: ${data.productTitle}`,
+    text: [
+      `مرحباً ${data.creatorName}،`,
+      "",
+      `لديك طلب فيزيائيّ جديد مدفوع: «${data.productTitle}».`,
+      `المشتري: ${data.buyerName} <${data.buyerEmail}>`,
+      `المبلغ: ${data.amountLabel}`,
+      addrText,
+      "",
+      "جهّز الطلب وحدّث حالته من لوحة التحكّم.",
+      `— ${FROM}`,
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    html: `<p>مرحباً ${data.creatorName}،</p>
+<p>لديك طلب فيزيائيّ جديد مدفوع: «<strong>${data.productTitle}</strong>».</p>
+<p>المشتري: ${data.buyerName} &lt;${data.buyerEmail}&gt;<br/>المبلغ: <strong>${data.amountLabel}</strong></p>
+${a ? `<p>المستلم: ${a.fullName} · ${a.phone}<br/>العنوان: ${a.line}، ${a.city}، ${a.country}${a.postalCode ? ` (${a.postalCode})` : ""}</p>` : ""}
+<p style="color:#666">جهّز الطلب وحدّث حالته من لوحة التحكّم.<br/>— ${FROM}</p>`,
+  });
+}
+
+interface ShipmentUpdateData {
+  orderId: string;
+  buyerName: string;
+  buyerEmail: string;
+  productTitle: string;
+  statusLabel: string;
+  trackingNumber: string | null;
+}
+
+export async function sendShipmentUpdateEmail(
+  data: ShipmentUpdateData,
+): Promise<void> {
+  const track = `${appUrl()}/track/${data.orderId}?e=${encodeURIComponent(
+    data.buyerEmail,
+  )}`;
+  await getEmailAdapter().send({
+    to: data.buyerEmail,
+    subject: `AktBot — تحديث شحن طلبك: ${data.productTitle}`,
+    text: [
+      `مرحباً ${data.buyerName}،`,
+      "",
+      `تحدّثت حالة طلب «${data.productTitle}» إلى: ${data.statusLabel}.`,
+      data.trackingNumber ? `رقم التتبّع: ${data.trackingNumber}` : "",
+      "",
+      "تفاصيل الطلب:",
+      track,
+      `— ${FROM}`,
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    html: `<p>مرحباً ${data.buyerName}،</p>
+<p>تحدّثت حالة طلب «<strong>${data.productTitle}</strong>» إلى: <strong>${data.statusLabel}</strong>.</p>
+${data.trackingNumber ? `<p>رقم التتبّع: <strong>${data.trackingNumber}</strong></p>` : ""}
+<p><a href="${track}">تفاصيل الطلب</a></p>
+<p style="color:#666">— ${FROM}</p>`,
+  });
+}

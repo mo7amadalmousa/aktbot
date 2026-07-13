@@ -2,8 +2,9 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
+import { FulfillmentControl } from "@/components/dashboard/fulfillment-control";
 import { formatMoney } from "@/lib/payments/money";
-import { kindLabel } from "@/lib/payments/service";
+import { kindLabel, PRODUCT_TYPE_LABEL } from "@/lib/payments/service";
 import { asRecord, str } from "@/lib/public/block-config";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +16,28 @@ const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
   REFUNDED: { label: "مُسترجَع", cls: "bg-muted text-muted-foreground" },
   CANCELLED: { label: "ملغى", cls: "bg-muted text-muted-foreground" },
 };
+
+const FULFILL_LABEL: Record<string, string> = {
+  PENDING: "بانتظار التجهيز",
+  PROCESSING: "قيد التجهيز",
+  SHIPPED: "تم الشحن",
+  DELIVERED: "تم التسليم",
+  CANCELLED: "أُلغي",
+};
+
+// وسم نوع الطلب: منتج (حسب نوعه) أو بلوك مدفوع.
+function orderLabel(o: {
+  productId: string | null;
+  blockType: string | null;
+  metadata: unknown;
+  productType?: string | null;
+}): string {
+  if (o.productId) {
+    const t = str(asRecord(o.metadata).productType) || o.productType || "DIGITAL";
+    return PRODUCT_TYPE_LABEL[t] ?? "منتج";
+  }
+  return kindLabel(o.blockType);
+}
 
 export default async function OrdersPage() {
   const session = await getSession();
@@ -31,6 +54,10 @@ export default async function OrdersPage() {
     where: { creatorProfileId: profile.id },
     orderBy: { createdAt: "desc" },
     take: 200,
+    include: {
+      product: { select: { type: true } },
+      shippingAddress: { select: { fullName: true, city: true, country: true } },
+    },
   });
 
   const paidTotal = orders
@@ -58,7 +85,7 @@ export default async function OrdersPage() {
 
         {orders.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-border py-16 text-center text-sm text-muted-foreground">
-            لا طلبات بعد. فعّل بلوك استشارة أو فيديو مدفوع في صفحتك.
+            لا طلبات بعد. فعّل بلوك مدفوع أو أضِف منتجاً في متجرك.
           </div>
         ) : (
           <div className="overflow-x-auto rounded-2xl border border-border">
@@ -69,6 +96,7 @@ export default async function OrdersPage() {
                   <th className="p-3 text-start font-medium">النوع</th>
                   <th className="p-3 text-start font-medium">المبلغ</th>
                   <th className="p-3 text-start font-medium">الحالة</th>
+                  <th className="p-3 text-start font-medium">الشحن / التنفيذ</th>
                   <th className="p-3 text-start font-medium">التاريخ</th>
                 </tr>
               </thead>
@@ -79,8 +107,9 @@ export default async function OrdersPage() {
                     label: o.status,
                     cls: "bg-muted text-muted-foreground",
                   };
+                  const isPhysical = o.product?.type === "PHYSICAL";
                   return (
-                    <tr key={o.id} className="border-t border-border">
+                    <tr key={o.id} className="border-t border-border align-top">
                       <td className="p-3">
                         <div className="font-medium text-foreground">
                           {o.buyerName}
@@ -90,7 +119,12 @@ export default async function OrdersPage() {
                         </div>
                       </td>
                       <td className="p-3 text-foreground">
-                        {kindLabel(o.blockType)}
+                        {orderLabel({
+                          productId: o.productId,
+                          blockType: o.blockType,
+                          metadata: o.metadata,
+                          productType: o.product?.type,
+                        })}
                         <div className="text-xs text-muted-foreground">
                           {str(meta.title)}
                         </div>
@@ -104,6 +138,21 @@ export default async function OrdersPage() {
                         >
                           {s.label}
                         </span>
+                      </td>
+                      <td className="p-3">
+                        {isPhysical && o.status === "PAID" ? (
+                          <FulfillmentControl
+                            orderId={o.id}
+                            initialStatus={o.fulfillmentStatus ?? "PENDING"}
+                            initialTracking={o.trackingNumber}
+                          />
+                        ) : isPhysical ? (
+                          <span className="text-xs text-muted-foreground">
+                            {FULFILL_LABEL[o.fulfillmentStatus ?? "PENDING"]}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
                       </td>
                       <td className="p-3 text-muted-foreground">
                         {o.createdAt.toISOString().slice(0, 10)}

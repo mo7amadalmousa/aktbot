@@ -131,18 +131,108 @@ async function seedLinaDigitalProduct(profileId: string, pageId: string) {
     select: { id: true },
   });
 
-  // بلوك متجر داخليّ يعرض المنتج بزرّ شراء فعّال.
+  // ── كورس (idempotent بالعنوان) — وحدتان + دروس (نصّ/فيديو تضمين) ──────
+  const courseTitle = "كورس العناية بالبشرة خطوة بخطوة";
+  await prisma.product.deleteMany({
+    where: { creatorProfileId: profileId, title: courseTitle },
+  });
+  const course = await prisma.product.create({
+    data: {
+      creatorProfileId: profileId,
+      type: "COURSE",
+      title: courseTitle,
+      description: "كورس فيديو + قراءات: أساسيّات العناية، بناء روتين، ومكوّنات فعّالة.",
+      price: 4900, // ‏$49.00
+      currency: "USD",
+      images: [
+        "https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=600&q=80",
+      ],
+      isActive: true,
+      modules: {
+        create: [
+          {
+            title: "الأساسيّات",
+            order: 0,
+            lessons: {
+              create: [
+                {
+                  title: "مقدّمة الكورس",
+                  order: 0,
+                  type: "VIDEO",
+                  contentRef: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+                  duration: "4:12",
+                },
+                {
+                  title: "أنواع البشرة",
+                  order: 1,
+                  type: "TEXT",
+                  contentRef:
+                    "لكلّ بشرة احتياجات مختلفة. في هذا الدرس نتعرّف على الأنواع الأربعة وكيفيّة تحديد نوعك…",
+                  duration: "قراءة 5 د",
+                },
+              ],
+            },
+          },
+          {
+            title: "بناء الروتين",
+            order: 1,
+            lessons: {
+              create: [
+                {
+                  title: "الروتين الصباحيّ",
+                  order: 0,
+                  type: "TEXT",
+                  contentRef: "التنظيف ← التونر ← السيروم ← المرطّب ← الواقي الشمسيّ.",
+                  duration: "قراءة 6 د",
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+    select: { id: true },
+  });
+
+  // ── منتج فيزيائيّ (idempotent بالعنوان) — مخزون + رسوم شحن ───────────
+  const physTitle = "رولر جادي للوجه (Jade Roller)";
+  await prisma.product.deleteMany({
+    where: { creatorProfileId: profileId, title: physTitle },
+  });
+  const physical = await prisma.product.create({
+    data: {
+      creatorProfileId: profileId,
+      type: "PHYSICAL",
+      title: physTitle,
+      description: "أداة تدليك الوجه لتحسين الدورة الدمويّة ونضارة البشرة.",
+      price: 3500, // ‏$35.00
+      currency: "USD",
+      stock: 25,
+      shippingFee: 500, // ‏$5.00
+      images: [
+        "https://images.unsplash.com/photo-1631730359585-38a4935cbec4?w=600&q=80",
+      ],
+      isActive: true,
+    },
+    select: { id: true },
+  });
+
+  // بلوك متجر داخليّ يعرض الأنواع الثلاثة بأزرار شراء فعّالة.
   await prisma.block.create({
     data: {
       pageId,
       type: "STORE",
       order: 10,
       visibility: true,
-      config: { title: "متجري", productIds: [product.id], products: [] },
+      config: {
+        title: "متجري",
+        productIds: [product.id, course.id, physical.id],
+        products: [],
+      },
     },
   });
 
-  return { productId: product.id };
+  return { digital: product.id, course: course.id, physical: physical.id };
 }
 
 async function main() {

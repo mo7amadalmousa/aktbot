@@ -22,6 +22,16 @@ export default async function PayResultPage({
   const meta = asRecord(order.metadata);
   const title = str(meta.title) || kindLabel(order.blockType);
   const paid = order.status === "PAID";
+  const productType = str(meta.productType);
+  const deliveryNote = !paid
+    ? ""
+    : productType === "COURSE"
+      ? " أرسلنا لبريدك رابط الوصول للكورس."
+      : productType === "PHYSICAL"
+        ? " أرسلنا لبريدك تأكيداً ورابط متابعة الشحن."
+        : productType === "DIGITAL"
+          ? " أرسلنا لبريدك رابط التحميل الآمن."
+          : " أرسلنا لك بريد تأكيد، وسيتواصل معك المبدع.";
 
   return (
     <main className="flex flex-1 items-center justify-center bg-muted/30 p-6">
@@ -40,7 +50,7 @@ export default async function PayResultPage({
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
           {paid
-            ? `تم استلام طلبك «${title}» (${formatMoney(order.amount, order.currency)}). أرسلنا لك بريد تأكيد، وسيتواصل معك المبدع.`
+            ? `تم استلام طلبك «${title}» (${formatMoney(order.amount, order.currency)}).${deliveryNote}`
             : `لم تكتمل عملية الدفع لطلب «${title}». لم يُخصَم أيّ مبلغ.`}
         </p>
         <Link

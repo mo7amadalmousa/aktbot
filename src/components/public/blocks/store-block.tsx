@@ -3,7 +3,17 @@ import { safeHref, safeCssUrl } from "@/lib/public/safe-url";
 import { formatMoney, toMinor } from "@/lib/payments/money";
 import { ResponsiveImage } from "@/components/public/responsive-image";
 import { BlockShell } from "./block-shell";
-import { ImageIcon } from "lucide-react";
+import { ImageIcon, Download, GraduationCap, Package } from "lucide-react";
+
+// وسم + أيقونة + نصّ زرّ لكلّ نوع منتج داخليّ.
+const TYPE_META: Record<
+  string,
+  { label: string; cta: string; Icon: typeof Download }
+> = {
+  DIGITAL: { label: "رقميّ", cta: "تحميل", Icon: Download },
+  COURSE: { label: "كورس", cta: "التحاق", Icon: GraduationCap },
+  PHYSICAL: { label: "منتج", cta: "شراء", Icon: Package },
+};
 
 // STORE: منتجات داخليّة حقيقيّة (زرّ شراء فعّال → /store/[id]) + منتجات خارجيّة
 // (أفلييت، رابط خارجيّ). المنتجات الداخليّة تُحلّ خادميّاً في resolvedProducts.
@@ -17,15 +27,17 @@ export function StoreBlock({
   const c = asRecord(config);
   const title = str(c.title);
 
-  // منتجات داخليّة محلولة (id/title/price minor/currency/image) — سعر القاعدة.
+  // منتجات داخليّة محلولة (id/type/title/price minor/currency/image) — سعر القاعدة.
   const internal = arr(c.resolvedProducts)
     .map((p) => {
       const r = asRecord(p);
       const id = str(r.id);
       const price = num(r.price);
       if (!id || price === null) return null;
+      const type = str(r.type);
       return {
         id,
+        type: TYPE_META[type] ? type : "DIGITAL",
         title: str(r.title) || "منتج",
         priceMinor: price,
         currency: str(r.currency) || "USD",
@@ -74,39 +86,49 @@ export function StoreBlock({
     <BlockShell frosted={frosted}>
       {title ? <p className="mb-3 text-sm font-semibold">{title}</p> : null}
       <div className="grid grid-cols-2 gap-3">
-        {/* منتجات داخليّة — شراء فعّال داخل المنصّة */}
-        {internal.map((p) => (
-          <a
-            key={p.id}
-            href={`/store/${p.id}`}
-            className="group block transition-transform hover:-translate-y-0.5"
-          >
-            <div className={imgWrap} style={imgRadius}>
-              {p.image ? (
-                <ResponsiveImage
-                  url={p.image}
-                  variant="gallery"
-                  alt={p.title}
-                  className="size-full object-cover"
-                />
-              ) : (
-                placeholder
-              )}
-            </div>
-            <p className="line-clamp-2 text-sm font-medium">{p.title}</p>
-            <div className="mt-1 flex items-center justify-between gap-2">
-              <span className="text-sm font-bold" style={{ color: "var(--pp-accent)" }}>
-                {formatMoney(p.priceMinor, p.currency)}
-              </span>
-              <span
-                className="rounded-full px-2.5 py-1 text-xs font-semibold"
-                style={{ background: "var(--pp-accent)", color: "var(--pp-accent-contrast, #fff)" }}
-              >
-                شراء
-              </span>
-            </div>
-          </a>
-        ))}
+        {/* منتجات داخليّة — شراء فعّال داخل المنصّة (بوسم النوع) */}
+        {internal.map((p) => {
+          const meta = TYPE_META[p.type];
+          const Icon = meta.Icon;
+          return (
+            <a
+              key={p.id}
+              href={`/store/${p.id}`}
+              className="group block transition-transform hover:-translate-y-0.5"
+            >
+              <div className={`${imgWrap} relative`} style={imgRadius}>
+                <span
+                  className="absolute end-1 top-1 z-10 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                  style={{ background: "var(--pp-surface, rgba(0,0,0,0.6))", color: "var(--pp-text, #fff)" }}
+                >
+                  <Icon className="size-3" /> {meta.label}
+                </span>
+                {p.image ? (
+                  <ResponsiveImage
+                    url={p.image}
+                    variant="gallery"
+                    alt={p.title}
+                    className="size-full object-cover"
+                  />
+                ) : (
+                  placeholder
+                )}
+              </div>
+              <p className="line-clamp-2 text-sm font-medium">{p.title}</p>
+              <div className="mt-1 flex items-center justify-between gap-2">
+                <span className="text-sm font-bold" style={{ color: "var(--pp-accent)" }}>
+                  {formatMoney(p.priceMinor, p.currency)}
+                </span>
+                <span
+                  className="rounded-full px-2.5 py-1 text-xs font-semibold"
+                  style={{ background: "var(--pp-accent)", color: "var(--pp-accent-contrast, #fff)" }}
+                >
+                  {meta.cta}
+                </span>
+              </div>
+            </a>
+          );
+        })}
 
         {/* منتجات خارجيّة — رابط أفلييت */}
         {external.map((p, i) => {
