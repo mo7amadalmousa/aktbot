@@ -11,7 +11,7 @@ import {
 import { cn } from "@/lib/utils";
 
 // هيكل الداشبورد المشترك (سايدبار + شريط جوّال) — يعاد استخدامه في المحرّر والطلبات.
-const NAV_SOON = [{ label: "التحليلات", Icon: BarChart3 }];
+const NAV_SOON: { label: string; Icon: typeof BarChart3 }[] = [];
 
 type NavKey =
   | "page"
@@ -19,7 +19,8 @@ type NavKey =
   | "bookings"
   | "orders"
   | "subscribers"
-  | "coupons";
+  | "coupons"
+  | "analytics";
 
 export function DashboardShell({
   active,
@@ -65,6 +66,7 @@ export function DashboardShell({
           {navItem("orders", "/dashboard/orders", "الطلبات", ShoppingBag)}
           {navItem("subscribers", "/dashboard/subscribers", "المشتركون", Mail)}
           {navItem("coupons", "/dashboard/coupons", "الخصومات", Tag)}
+          {navItem("analytics", "/dashboard/analytics", "التحليلات", BarChart3)}
           {NAV_SOON.map(({ label, Icon }) => (
             <span
               key={label}

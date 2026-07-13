@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { asRecord, str, num, arr } from "@/lib/public/block-config";
 import { resolvePageTheme } from "@/lib/public/page-theme";
 import { PublicPageBody } from "@/components/public/public-page-body";
+import { AnalyticsTracker } from "@/components/public/analytics-tracker";
 
 // caching قويّ — الصفحة العامّة بلا مصادقة/كوكيز.
 export const revalidate = 300;
@@ -127,8 +128,10 @@ export default async function PublicPage({
     });
 
   return (
-    <PublicPageBody
-      profile={{
+    <>
+      <AnalyticsTracker username={profile.username} />
+      <PublicPageBody
+        profile={{
         displayName: profile.displayName,
         bio: profile.bio,
         avatarUrl: profile.avatarUrl,
@@ -138,11 +141,12 @@ export default async function PublicPage({
         language: profile.language,
         direction: profile.direction,
       }}
-      theme={theme}
-      background={profile.page?.background}
-      blocks={blocks}
-      username={profile.username}
-      interactive
-    />
+        theme={theme}
+        background={profile.page?.background}
+        blocks={blocks}
+        username={profile.username}
+        interactive
+      />
+    </>
   );
 }
