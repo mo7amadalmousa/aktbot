@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createOrderForBlock, CheckoutError } from "@/lib/payments/service";
+import {
+  ATTR_COOKIE,
+  resolveActiveParticipationRef,
+} from "@/lib/attribution/engine";
 
 export const runtime = "nodejs";
 
@@ -10,12 +14,18 @@ export async function POST(req: NextRequest) {
   const buyerEmail = String(form.get("buyerEmail") ?? "");
   const instructions = String(form.get("instructions") ?? "");
 
+  const participationId = await resolveActiveParticipationRef(
+    req.cookies.get(ATTR_COOKIE)?.value,
+    String(form.get("attrCode") ?? "") || null,
+  );
+
   try {
     const { checkoutUrl } = await createOrderForBlock({
       blockId,
       buyerName,
       buyerEmail,
       instructions: instructions || undefined,
+      participationId,
     });
     return NextResponse.redirect(new URL(checkoutUrl, req.url), { status: 303 });
   } catch (e) {

@@ -180,6 +180,17 @@ export default async function StoreProductPage({
                   placeholder="you@example.com"
                 />
               </label>
+              <label className="block">
+                <span className="mb-1 block text-sm font-medium text-foreground">
+                  كود إحالة (اختياريّ)
+                </span>
+                <input
+                  name="attrCode"
+                  defaultValue={one(sp.code) ?? ""}
+                  className={shipField}
+                  placeholder="ادخل الكود إن وُجد"
+                />
+              </label>
 
               {/* عنوان الشحن — الفيزيائيّ فقط */}
               {isPhysical ? (

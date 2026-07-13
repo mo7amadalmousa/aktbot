@@ -136,6 +136,7 @@ export interface CreateOrderInput {
   buyerName: string;
   buyerEmail: string;
   instructions?: string;
+  participationId?: string | null; // إسناد حملة (اختياريّ)
 }
 
 function cleanBuyer(name: string, email: string) {
@@ -162,6 +163,7 @@ export async function createOrderForBlock(input: CreateOrderInput) {
       buyerEmail,
       blockType: purchasable.block.type,
       blockId: purchasable.block.id,
+      participationId: input.participationId ?? null,
       amount: purchasable.amountMinor, // من القاعدة — لا من العميل
       currency: purchasable.currency,
       status: "PENDING",
@@ -206,6 +208,7 @@ export interface CreateProductOrderInput {
   buyerName: string;
   buyerEmail: string;
   shipping?: ShippingInput;
+  participationId?: string | null; // إسناد حملة (اختياريّ)
 }
 
 function cleanShipping(raw: ShippingInput | undefined): {
@@ -246,6 +249,7 @@ export async function createOrderForProduct(input: CreateProductOrderInput) {
       buyerName,
       buyerEmail,
       productId: purchasable.product.id,
+      participationId: input.participationId ?? null,
       amount: purchasable.amountMinor, // سعر القاعدة (+ الشحن) — لا من العميل
       currency: purchasable.currency,
       status: "PENDING",

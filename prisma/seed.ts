@@ -619,6 +619,56 @@ async function main() {
     });
   }
 
+  // ── حساب علامة (BRAND) + حملة نشطة + مشاركة لينا (إسناد) ─────────────
+  const brandUser = await prisma.user.upsert({
+    where: { email: "brand@demo.aktbot.local" },
+    update: { role: "BRAND", emailVerified: true },
+    create: {
+      email: "brand@demo.aktbot.local",
+      passwordHash: adminHash,
+      role: "BRAND",
+      emailVerified: true,
+    },
+    select: { id: true },
+  });
+  const brandProfile = await prisma.brandProfile.upsert({
+    where: { userId: brandUser.id },
+    update: { brandName: "Glow Cosmetics", isVerified: true },
+    create: {
+      userId: brandUser.id,
+      brandName: "Glow Cosmetics",
+      website: "https://glow.example.com",
+      contactEmail: "hello@glow.example.com",
+      description: "علامة عناية بالبشرة — حملات مع مبدعات مختارات.",
+      isVerified: true,
+    },
+    select: { id: true },
+  });
+  await prisma.campaign.deleteMany({ where: { brandId: brandProfile.id } }); // cascade
+  const campaign = await prisma.campaign.create({
+    data: {
+      brandId: brandProfile.id,
+      title: "حملة إطلاق الصيف",
+      type: "SALE",
+      status: "ACTIVE",
+    },
+    select: { id: true },
+  });
+  await prisma.campaignParticipation.create({
+    data: {
+      campaignId: campaign.id,
+      creatorProfileId: lina.profileId,
+      uniqueCode: "LINAGLOW",
+      uniqueLink: "/r/LINAGLOW",
+      status: "ACTIVE",
+      joinedAt: new Date(),
+      clicks: 12,
+      conversions: 2,
+      sales: 2,
+      salesValue: 3998,
+    },
+  });
+
   console.log("✓ seeded:", lina, sara, linaProduct);
 }
 
