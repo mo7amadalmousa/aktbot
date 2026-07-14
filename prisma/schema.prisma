@@ -124,6 +124,7 @@ model CreatorProfile {
   blockClicks  BlockClick[]
   commissions  CommissionLedger[]
   participations CampaignParticipation[]
+  campaignPayouts CampaignPayout[]
 }
 
 // مشتركو النشرة البريديّة لكل مبدع (جمع فقط الآن؛ إرسال الحملات لاحقاً).
@@ -585,18 +586,34 @@ enum CampaignType {
 }
 
 model Campaign {
-  id        String         @id @default(cuid())
-  brandId   String
-  title     String
-  status    CampaignStatus @default(DRAFT)
-  type      CampaignType   @default(SALE)
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
+  id          String         @id @default(cuid())
+  brandId     String
+  title       String
+  status      CampaignStatus @default(DRAFT)
+  type        CampaignType   @default(SALE)
+  // إكمال الحملة (additive) — كلّها اختياريّة لعدم كسر الحملات القائمة.
+  description String?
+  brief       String? // ما تريده العلامة من المبدع
+  coverImage  String?
+  budgetAmount Int? // minor — بعملة الحملة
+  currency    String?
+  startAt     DateTime?
+  endAt       DateTime?
+  targetUrl   String? // وجهة الإسناد (SALE)
+  requirements Json? // متطلّبات/شروط المحتوى
+  // إعدادات الدفع حسب النوع (json مرن): SALE {creatorBps|fixedPerSale} ·
+  // PERFORMANCE {cpcMinor} · UGC {fixedPerContent}. minor بعملة الحملة.
+  payoutConfig Json?
+  spentAmount Int            @default(0) // مجموع المستحقات (لحماية الميزانية O(1))
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
 
   brand          BrandProfile            @relation(fields: [brandId], references: [id], onDelete: Cascade)
   participations CampaignParticipation[]
+  payouts        CampaignPayout[]
 
   @@index([brandId])
+  @@index([status])
 }
 
 enum ParticipationStatus {
@@ -619,6 +636,7 @@ model CampaignParticipation {
   conversions      Int                 @default(0)
   sales            Int                 @default(0)
   salesValue       Int                 @default(0) // minor
+  payoutAccrued    Int                 @default(0) // مستحقّ المبدع من الحملة (minor)
   joinedAt         DateTime?
   createdAt        DateTime            @default(now())
 
@@ -626,6 +644,7 @@ model CampaignParticipation {
   creatorProfile    CreatorProfile     @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
   attributionEvents AttributionEvent[]
   orders            Order[]
+  payouts           CampaignPayout[]
 
   @@unique([campaignId, creatorProfileId])
   @@index([campaignId])
@@ -653,4 +672,41 @@ model AttributionEvent {
 
   @@index([participationId])
   @@index([type])
+}
+
+// ── مستحقات المبدع من الحملات (سجلّ — مصدر الحقيقة، نفس فلسفة Ledger) ──
+enum PayoutType {
+  SALE // نسبة/مبلغ من بيعة مُسنَدة
+  PERFORMANCE // لكل نقرة (CPC)
+  UGC // لكل محتوى مقبول (القبول في ن22)
+}
+
+enum PayoutStatus {
+  ACCRUED // مستحقّة
+  APPROVED // مقبولة (UGC بعد المراجعة)
+  PAID // سُوّيت (S32 لاحقاً)
+  REVERSED // عُكِست
+}
+
+model CampaignPayout {
+  id               String       @id @default(cuid())
+  campaignId       String
+  participationId  String
+  creatorProfileId String
+  type             PayoutType
+  amount           Int // minor — بعملة الحملة
+  currency         String
+  orderId          String?      @unique // SALE: idempotency (null للأنواع الأخرى)
+  status           PayoutStatus @default(ACCRUED)
+  note             String?
+  createdAt        DateTime     @default(now())
+
+  campaign       Campaign              @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  participation  CampaignParticipation @relation(fields: [participationId], references: [id], onDelete: Cascade)
+  creatorProfile CreatorProfile        @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@index([participationId])
+  @@index([creatorProfileId])
+  @@index([status])
 }

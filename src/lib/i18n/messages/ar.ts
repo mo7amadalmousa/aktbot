@@ -175,5 +175,20 @@ export const ar: Messages = {
       deferred:
         "السجلّ مصدر الحقيقة · العمولة تُحسب عند الدفع · السحب/التسوية لاحقاً (mock الآن).",
     },
+    campaigns: {
+      title: "إشراف الحملات",
+      desc: "كل حملات المنصّة (العلامة · النوع · الميزانية · الأداء).",
+      total: "الحملات",
+      active: "النشطة",
+      totalBudget: "إجمالي الميزانيّات",
+      colTitle: "العنوان",
+      colBrand: "العلامة",
+      colType: "النوع",
+      colStatus: "الحالة",
+      colBudget: "الميزانية",
+      colSpent: "المصروف",
+      colParticipants: "المشاركون",
+      colSales: "المبيعات",
+    },
   },
 };

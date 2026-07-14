@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth/session";
 import { asRecord, str } from "@/lib/public/block-config";
 import { normalizeUsername } from "@/lib/validation";
-import { ensureParticipation } from "@/lib/attribution/engine";
+import { inviteParticipation } from "@/lib/attribution/engine";
 
 export const runtime = "nodejs";
 
@@ -43,12 +43,14 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "لا مبدع بهذا الاسم." }, { status: 404 });
   }
 
-  const p = await ensureParticipation(campaign.id, creator.id);
+  // دعوة (INVITED) — الإسناد يُفعَّل حين يقبل المبدع.
+  const p = await inviteParticipation(campaign.id, creator.id);
   return NextResponse.json({
     ok: true,
     participationId: p.id,
     code: p.code,
     link: p.link,
     created: p.created,
+    status: p.status,
   });
 }

@@ -42,7 +42,7 @@ export const CONSOLE_NAV: NavGroup[] = [
   {
     key: "groupGrowth",
     items: [
-      { key: "campaigns", href: "/admin/campaigns", icon: Megaphone, enabled: false },
+      { key: "campaigns", href: "/admin/campaigns", icon: Megaphone, enabled: true },
     ],
   },
   {

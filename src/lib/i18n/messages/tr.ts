@@ -175,5 +175,20 @@ export const tr: Messages = {
       deferred:
         "Defter gerçeğin kaynağıdır · komisyon ödemede tahakkuk eder · ödeme/mutabakat sonra (şimdilik mock).",
     },
+    campaigns: {
+      title: "Kampanya Denetimi",
+      desc: "Tüm platform kampanyaları (marka · tür · bütçe · performans).",
+      total: "Kampanyalar",
+      active: "Aktif",
+      totalBudget: "Toplam bütçe",
+      colTitle: "Başlık",
+      colBrand: "Marka",
+      colType: "Tür",
+      colStatus: "Durum",
+      colBudget: "Bütçe",
+      colSpent: "Harcanan",
+      colParticipants: "Katılımcılar",
+      colSales: "Satışlar",
+    },
   },
 };

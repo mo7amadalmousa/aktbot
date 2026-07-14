@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
-import { getBrandOverview } from "@/lib/attribution/query";
+import { getBrandOverview, PARTICIPATION_STATUS_LABEL } from "@/lib/attribution/query";
 import { StatCard, fmtNum } from "@/components/dashboard/analytics-bits";
 import { formatMoney } from "@/lib/payments/money";
 import {
@@ -57,75 +57,92 @@ export default async function BrandPage() {
         </div>
 
         <section>
-          <div className="mb-3 flex items-center justify-between">
-            <h1 className="text-lg font-bold text-foreground">الحملات</h1>
-            <NewCampaignForm />
-          </div>
+          <h1 className="mb-3 text-lg font-bold text-foreground">الحملات</h1>
+          <NewCampaignForm />
 
           {data.campaigns.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border py-12 text-center text-sm text-muted-foreground">
-              لا حملات بعد. أنشئ حملة ثم أضِف مبدعين — يُولَّد لكل مبدع كود/رابط فريد.
+            <div className="mt-4 rounded-2xl border border-dashed border-border py-12 text-center text-sm text-muted-foreground">
+              لا حملات بعد. أنشئ حملة ثم ادعُ مبدعين — يُولَّد لكل مبدع كود/رابط فريد.
             </div>
           ) : (
-            <div className="space-y-4">
-              {data.campaigns.map((c) => (
-                <div key={c.id} className="rounded-2xl border border-border bg-card p-4">
-                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <h2 className="font-semibold text-foreground">{c.title}</h2>
-                      <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">{c.typeLabel}</span>
+            <div className="mt-4 space-y-4">
+              {data.campaigns.map((c) => {
+                const pct = c.budgetAmount ? Math.min(100, Math.round((c.spentAmount / c.budgetAmount) * 100)) : 0;
+                return (
+                  <div key={c.id} className="rounded-2xl border border-border bg-card p-4">
+                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <h2 className="font-semibold text-foreground">{c.title}</h2>
+                        <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">{c.typeLabel}</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-muted-foreground">
+                          {fmtNum(c.totals.clicks)} نقرة · {fmtNum(c.totals.sales)} بيع · {formatMoney(c.totals.salesValue, c.currency)}
+                        </span>
+                        <CampaignStatusSelect campaignId={c.id} status={c.status} />
+                      </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs text-muted-foreground">
-                        {fmtNum(c.totals.clicks)} نقرة · {fmtNum(c.totals.sales)} بيع ·{" "}
-                        {formatMoney(c.totals.salesValue, "USD")}
-                      </span>
-                      <CampaignStatusSelect campaignId={c.id} status={c.status} />
-                    </div>
-                  </div>
 
-                  {c.participations.length > 0 ? (
-                    <div className="overflow-x-auto rounded-xl border border-border">
-                      <table className="w-full text-sm">
-                        <thead className="bg-muted/50 text-muted-foreground">
-                          <tr>
-                            <th className="p-2 text-start font-medium">المبدع</th>
-                            <th className="p-2 text-start font-medium">الكود</th>
-                            <th className="p-2 text-start font-medium">الرابط</th>
-                            <th className="p-2 text-start font-medium">نقرات</th>
-                            <th className="p-2 text-start font-medium">مبيعات</th>
-                            <th className="p-2 text-start font-medium">القيمة</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {c.participations.map((p) => (
-                            <tr key={p.id} className="border-t border-border">
-                              <td className="p-2 text-foreground">
-                                {p.creatorName}
-                                <span className="ms-1 text-[10px] text-muted-foreground">/{p.username}</span>
-                              </td>
-                              <td className="p-2">
-                                <span className="font-mono text-xs text-foreground">{p.code}</span>{" "}
-                                <CopyBtn text={p.code} label="نسخ" />
-                              </td>
-                              <td className="p-2">
-                                <CopyBtn text={`${base}${p.link}`} label={p.link} />
-                              </td>
-                              <td className="p-2 text-muted-foreground">{fmtNum(p.clicks)}</td>
-                              <td className="p-2 text-muted-foreground">{fmtNum(p.sales)}</td>
-                              <td className="p-2 font-medium text-foreground">{formatMoney(p.salesValue, "USD")}</td>
+                    {/* الميزانية والمصروف */}
+                    {c.budgetAmount ? (
+                      <div className="mb-3">
+                        <div className="mb-1 flex justify-between text-xs text-muted-foreground">
+                          <span>المصروف: {formatMoney(c.spentAmount, c.currency)} من {formatMoney(c.budgetAmount, c.currency)}</span>
+                          <span>{pct}%{pct >= 100 ? " · مستنفدة" : ""}</span>
+                        </div>
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                          <div className={`h-full rounded-full ${pct >= 100 ? "bg-destructive" : "bg-primary"}`} style={{ width: `${Math.max(2, pct)}%` }} />
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="mb-3 text-xs text-muted-foreground">المصروف: {formatMoney(c.spentAmount, c.currency)} · بلا سقف ميزانيّة</p>
+                    )}
+
+                    {c.participations.length > 0 ? (
+                      <div className="overflow-x-auto rounded-xl border border-border">
+                        <table className="w-full text-sm">
+                          <thead className="bg-muted/50 text-muted-foreground">
+                            <tr>
+                              <th className="p-2 text-start font-medium">المبدع</th>
+                              <th className="p-2 text-start font-medium">الحالة</th>
+                              <th className="p-2 text-start font-medium">الكود/الرابط</th>
+                              <th className="p-2 text-start font-medium">نقرات</th>
+                              <th className="p-2 text-start font-medium">مبيعات</th>
+                              <th className="p-2 text-start font-medium">مستحقّه</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">لا مبدعين في هذه الحملة بعد.</p>
-                  )}
+                          </thead>
+                          <tbody>
+                            {c.participations.map((p) => (
+                              <tr key={p.id} className="border-t border-border">
+                                <td className="p-2 text-foreground">
+                                  {p.creatorName}
+                                  <span className="ms-1 text-[10px] text-muted-foreground">/{p.username}</span>
+                                </td>
+                                <td className="p-2">
+                                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${p.status === "ACTIVE" ? "bg-primary/10 text-primary" : "bg-amber-500/15 text-amber-600 dark:text-amber-400"}`}>
+                                    {PARTICIPATION_STATUS_LABEL[p.status] ?? p.status}
+                                  </span>
+                                </td>
+                                <td className="p-2">
+                                  <span className="font-mono text-xs text-foreground">{p.code}</span>{" "}
+                                  <CopyBtn text={`${base}${p.link}`} label="نسخ الرابط" />
+                                </td>
+                                <td className="p-2 text-muted-foreground">{fmtNum(p.clicks)}</td>
+                                <td className="p-2 text-muted-foreground">{fmtNum(p.sales)}</td>
+                                <td className="p-2 font-medium text-foreground">{formatMoney(p.payoutAccrued, c.currency)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">لا مبدعين في هذه الحملة بعد.</p>
+                    )}
 
-                  <AddCreatorForm campaignId={c.id} />
-                </div>
-              ))}
+                    <AddCreatorForm campaignId={c.id} />
+                  </div>
+                );
+              })}
             </div>
           )}
         </section>

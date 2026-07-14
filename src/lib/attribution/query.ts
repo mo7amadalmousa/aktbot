@@ -1,16 +1,15 @@
 import { prisma } from "@/lib/prisma";
+import {
+  CAMPAIGN_STATUS_LABEL,
+  CAMPAIGN_TYPE_LABEL,
+} from "@/lib/attribution/labels";
 
-export const CAMPAIGN_STATUS_LABEL: Record<string, string> = {
-  DRAFT: "مسودّة",
-  ACTIVE: "نشطة",
-  PAUSED: "موقوفة",
-  ENDED: "منتهية",
-};
-export const CAMPAIGN_TYPE_LABEL: Record<string, string> = {
-  SALE: "مبيعات",
-  PERFORMANCE: "أداء",
-  UGC: "محتوى (UGC)",
-};
+// إعادة تصدير الوسوم (للصفحات الخادميّة) — المصدر في labels.ts (آمن للعميل).
+export {
+  CAMPAIGN_STATUS_LABEL,
+  CAMPAIGN_TYPE_LABEL,
+  PARTICIPATION_STATUS_LABEL,
+} from "@/lib/attribution/labels";
 
 export interface PerfTotals {
   clicks: number;
@@ -29,6 +28,7 @@ export interface ParticipationView {
   conversions: number;
   sales: number;
   salesValue: number;
+  payoutAccrued: number;
 }
 export interface CampaignView {
   id: string;
@@ -37,6 +37,9 @@ export interface CampaignView {
   statusLabel: string;
   type: string;
   typeLabel: string;
+  currency: string;
+  budgetAmount: number | null;
+  spentAmount: number;
   participations: ParticipationView[];
   totals: PerfTotals;
 }
@@ -60,7 +63,7 @@ const add = (a: PerfTotals, p: { clicks: number; conversions: number; sales: num
   a.salesValue += p.salesValue;
 };
 
-// نظرة العلامة (ملكية عبر userId) — حملاتها + مشاركاتها + أداء مجمّع.
+// نظرة العلامة (ملكية عبر userId) — حملاتها + مشاركاتها + أداء مجمّع + الميزانية.
 export async function getBrandOverview(userId: string): Promise<BrandOverview> {
   const brand = await prisma.brandProfile.findUnique({
     where: { userId },
@@ -101,6 +104,7 @@ export async function getBrandOverview(userId: string): Promise<BrandOverview> {
         conversions: p.conversions,
         sales: p.sales,
         salesValue: p.salesValue,
+        payoutAccrued: p.payoutAccrued,
       };
     });
     add(totals, cTotals);
@@ -111,6 +115,9 @@ export async function getBrandOverview(userId: string): Promise<BrandOverview> {
       statusLabel: CAMPAIGN_STATUS_LABEL[c.status] ?? c.status,
       type: c.type,
       typeLabel: CAMPAIGN_TYPE_LABEL[c.type] ?? c.type,
+      currency: c.currency ?? "USD",
+      budgetAmount: c.budgetAmount,
+      spentAmount: c.spentAmount,
       participations,
       totals: cTotals,
     };
@@ -120,6 +127,8 @@ export async function getBrandOverview(userId: string): Promise<BrandOverview> {
 }
 
 export interface CreatorParticipationView {
+  id: string;
+  campaignId: string;
   campaignTitle: string;
   brandName: string;
   code: string;
@@ -129,9 +138,11 @@ export interface CreatorParticipationView {
   conversions: number;
   sales: number;
   salesValue: number;
+  payoutAccrued: number;
+  currency: string;
 }
 
-// مشاركات مبدع (ملكية) — أدائي في كل حملة.
+// مشاركات مبدع (ملكية) — أدائي في كل حملة + مستحقّي + الدعوات المعلّقة.
 export async function getCreatorParticipations(
   creatorProfileId: string,
 ): Promise<CreatorParticipationView[]> {
@@ -140,11 +151,13 @@ export async function getCreatorParticipations(
     orderBy: { createdAt: "desc" },
     include: {
       campaign: {
-        select: { title: true, brand: { select: { brandName: true } } },
+        select: { id: true, title: true, currency: true, brand: { select: { brandName: true } } },
       },
     },
   });
   return rows.map((p) => ({
+    id: p.id,
+    campaignId: p.campaign.id,
     campaignTitle: p.campaign.title,
     brandName: p.campaign.brand.brandName,
     code: p.uniqueCode,
@@ -154,5 +167,59 @@ export async function getCreatorParticipations(
     conversions: p.conversions,
     sales: p.sales,
     salesValue: p.salesValue,
+    payoutAccrued: p.payoutAccrued,
+    currency: p.campaign.currency ?? "USD",
   }));
+}
+
+export interface AdminCampaignRow {
+  id: string;
+  title: string;
+  brandName: string;
+  type: string;
+  status: string;
+  currency: string;
+  budgetAmount: number | null;
+  spentAmount: number;
+  participants: number;
+  clicks: number;
+  sales: number;
+  salesValue: number;
+}
+
+// كل حملات المنصّة (admin) — للإشراف عبر DataTable.
+export async function getPlatformCampaigns(): Promise<AdminCampaignRow[]> {
+  const rows = await prisma.campaign.findMany({
+    orderBy: { createdAt: "desc" },
+    include: {
+      brand: { select: { brandName: true } },
+      participations: { select: { clicks: true, sales: true, salesValue: true } },
+      _count: { select: { participations: true } },
+    },
+  });
+  return rows.map((c) => {
+    const agg = c.participations.reduce(
+      (a, p) => {
+        a.clicks += p.clicks;
+        a.sales += p.sales;
+        a.salesValue += p.salesValue;
+        return a;
+      },
+      { clicks: 0, sales: 0, salesValue: 0 },
+    );
+    return {
+      id: c.id,
+      title: c.title,
+      brandName: c.brand.brandName,
+      type: c.type,
+      status: c.status,
+      currency: c.currency ?? "USD",
+      budgetAmount: c.budgetAmount,
+      spentAmount: c.spentAmount,
+      participants: c._count.participations,
+      clicks: agg.clicks,
+      sales: agg.sales,
+      salesValue: agg.salesValue,
+    };
+  });
 }
