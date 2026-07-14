@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ThemeToggleMini } from "@/components/dashboard/theme-toggle-mini";
 import {
   LayoutGrid,
   ShoppingBag,
@@ -89,6 +90,9 @@ export function DashboardShell({
           <p className="mb-2 truncate px-2 text-xs text-muted-foreground">
             {email}
           </p>
+          <div className="mb-2">
+            <ThemeToggleMini />
+          </div>
           <form method="post" action="/api/auth/logout">
             <button
               type="submit"

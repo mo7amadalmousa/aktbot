@@ -59,7 +59,80 @@ export interface LandingMessages {
   };
 }
 
+// ── نطاق الكونسول (لوحة الإشراف) ──────────────────────────────────────
+export interface AdminMessages {
+  brand: string;
+  console: string; // "لوحة الإشراف"
+  searchPlaceholder: string;
+  logout: string;
+  language: string;
+  // الوضع — التسمية الإبداعية: داكن «قاع المحيط» · فاتح «سطح المحيط».
+  theme: { toDark: string; toLight: string };
+  nav: {
+    groupMain: string;
+    groupPeople: string;
+    groupGrowth: string;
+    groupFinance: string;
+    groupSystem: string;
+    overview: string;
+    creators: string;
+    brands: string;
+    campaigns: string;
+    commission: string;
+    reports: string;
+    settings: string;
+    soon: string;
+  };
+  table: {
+    search: string;
+    empty: string;
+    emptyDesc: string;
+    prev: string;
+    next: string;
+    page: string;
+    of: string;
+    export: string;
+  };
+  overview: {
+    title: string;
+    desc: string;
+    creators: string;
+    published: string;
+    visitors: string;
+    unique: string;
+    orders: string;
+    paid: string;
+    sales: string;
+    salesSub: string;
+    bookings: string;
+    confirmed: string;
+    trend: string;
+    topCreators: string;
+    recentCreators: string;
+    noData: string;
+    colCreator: string;
+    colViews: string;
+    colStatus: string;
+    colDate: string;
+    statusPublished: string;
+    statusDraft: string;
+  };
+  commission: {
+    title: string;
+    desc: string;
+    tx: string;
+    totalCommission: string;
+    totalSales: string;
+    avg: string;
+    bySource: string;
+    trend: string;
+    noTx: string;
+    deferred: string;
+  };
+}
+
 // خريطة النطاقات — أضِف `dashboard: DashboardMessages` لاحقاً دون كسر البنية.
 export interface Messages {
   landing: LandingMessages;
+  admin: AdminMessages;
 }
