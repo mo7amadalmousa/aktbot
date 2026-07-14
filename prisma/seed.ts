@@ -678,12 +678,22 @@ async function main() {
     select: { id: true },
   });
   await prisma.campaign.deleteMany({ where: { brandId: brandProfile.id } }); // cascade
+  // حملة SALE كاملة (ميزانية + نسبة المبدع 20% + شروط) — لينا نشطة.
   const campaign = await prisma.campaign.create({
     data: {
       brandId: brandProfile.id,
       title: "حملة إطلاق الصيف",
       type: "SALE",
       status: "ACTIVE",
+      description: "روّجي منتجاتنا واكسبي 20% من كل بيعة عبر رابطك.",
+      brief: "أنشئي محتوى يعرض المنتج مع كودك الخاصّ.",
+      coverImage: "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=600&q=80",
+      currency: "USD",
+      budgetAmount: 50000, // ‏$500
+      targetUrl: "https://glow.example.com/summer",
+      requirements: { items: ["ذكر العلامة", "استخدام الكود في الوصف"] },
+      payoutConfig: { creatorBps: 2000 }, // 20% للمبدع
+      spentAmount: 800, // مصروف تجريبيّ (يطابق مستحقّ لينا)
     },
     select: { id: true },
   });
@@ -699,6 +709,31 @@ async function main() {
       conversions: 2,
       sales: 2,
       salesValue: 3998,
+      payoutAccrued: 800,
+    },
+  });
+  // دعوة سارة (INVITED) — لاختبار القبول.
+  await prisma.campaignParticipation.create({
+    data: {
+      campaignId: campaign.id,
+      creatorProfileId: sara.profileId,
+      uniqueCode: "SARAGLOW",
+      uniqueLink: "/r/SARAGLOW",
+      status: "INVITED",
+    },
+  });
+
+  // حملة UGC (بنية · بلا احتساب تلقائيّ — القبول في ن22).
+  await prisma.campaign.create({
+    data: {
+      brandId: brandProfile.id,
+      title: "تحدّي المحتوى الخريفيّ (UGC)",
+      type: "UGC",
+      status: "ACTIVE",
+      description: "أنشئي فيديو UGC واكسبي مبلغاً لكل محتوى مقبول.",
+      currency: "USD",
+      budgetAmount: 100000, // ‏$1000
+      payoutConfig: { fixedPerContent: 5000 }, // ‏$50 لكل محتوى
     },
   });
 

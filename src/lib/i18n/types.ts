@@ -129,6 +129,21 @@ export interface AdminMessages {
     noTx: string;
     deferred: string;
   };
+  campaigns: {
+    title: string;
+    desc: string;
+    total: string;
+    active: string;
+    totalBudget: string;
+    colTitle: string;
+    colBrand: string;
+    colType: string;
+    colStatus: string;
+    colBudget: string;
+    colSpent: string;
+    colParticipants: string;
+    colSales: string;
+  };
 }
 
 // خريطة النطاقات — أضِف `dashboard: DashboardMessages` لاحقاً دون كسر البنية.

@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth/session";
-import { asRecord, str } from "@/lib/public/block-config";
+import { sanitizeCampaignInput, CampaignError } from "@/lib/campaign/config";
 import type { CampaignType, CampaignStatus } from "@/generated/prisma/enums";
 
 export const runtime = "nodejs";
-
-const TYPES = ["SALE", "PERFORMANCE", "UGC"];
-const STATUSES = ["DRAFT", "ACTIVE", "PAUSED", "ENDED"];
 
 // ملف العلامة للمستخدم الحاليّ (ملكية).
 async function requireBrand(userId: string, role: string) {
@@ -15,16 +12,26 @@ async function requireBrand(userId: string, role: string) {
   return prisma.brandProfile.findUnique({ where: { userId }, select: { id: true } });
 }
 
-// POST — إنشاء حملة (هيكل أساسيّ · ن18 يكمّلها).
+// GET — حملات العلامة (للوحتها).
+export async function GET() {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ ok: false, error: "غير مصادق." }, { status: 401 });
+  const brand = await requireBrand(session.sub, session.role);
+  if (!brand) return NextResponse.json({ ok: false, error: "غير مصرّح." }, { status: 403 });
+  const campaigns = await prisma.campaign.findMany({
+    where: { brandId: brand.id },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, title: true, type: true, status: true },
+  });
+  return NextResponse.json({ ok: true, campaigns });
+}
+
+// POST — إنشاء حملة كاملة (النوع + الميزانية + الشروط + إعداد الدفع).
 export async function POST(req: NextRequest) {
   const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ ok: false, error: "غير مصادق." }, { status: 401 });
-  }
+  if (!session) return NextResponse.json({ ok: false, error: "غير مصادق." }, { status: 401 });
   const brand = await requireBrand(session.sub, session.role);
-  if (!brand) {
-    return NextResponse.json({ ok: false, error: "غير مصرّح." }, { status: 403 });
-  }
+  if (!brand) return NextResponse.json({ ok: false, error: "غير مصرّح." }, { status: 403 });
 
   let body: unknown;
   try {
@@ -32,18 +39,37 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ ok: false, error: "طلب غير صالح." }, { status: 400 });
   }
-  const b = asRecord(body);
-  const title = str(b.title).trim().slice(0, 140);
-  if (!title) {
-    return NextResponse.json({ ok: false, error: "عنوان الحملة مطلوب." }, { status: 422 });
+  let clean;
+  try {
+    clean = sanitizeCampaignInput(body);
+  } catch (e) {
+    if (e instanceof CampaignError) {
+      return NextResponse.json({ ok: false, error: e.message }, { status: 422 });
+    }
+    throw e;
   }
-  const typeRaw = str(b.type).toUpperCase();
-  const type = (TYPES.includes(typeRaw) ? typeRaw : "SALE") as CampaignType;
-  const statusRaw = str(b.status).toUpperCase();
-  const status = (STATUSES.includes(statusRaw) ? statusRaw : "DRAFT") as CampaignStatus;
+
+  // الحالة الابتدائيّة: DRAFT (أو ACTIVE إن طُلب صراحةً).
+  const wantActive = String((body as Record<string, unknown>).status ?? "").toUpperCase() === "ACTIVE";
+  const status: CampaignStatus = wantActive ? "ACTIVE" : "DRAFT";
 
   const campaign = await prisma.campaign.create({
-    data: { brandId: brand.id, title, type, status },
+    data: {
+      brandId: brand.id,
+      title: clean.title,
+      type: clean.type as CampaignType,
+      status,
+      description: clean.description,
+      brief: clean.brief,
+      coverImage: clean.coverImage,
+      currency: clean.currency,
+      budgetAmount: clean.budgetAmount,
+      startAt: clean.startAt,
+      endAt: clean.endAt,
+      targetUrl: clean.targetUrl,
+      requirements: clean.requirements as object,
+      payoutConfig: clean.payoutConfig as object,
+    },
     select: { id: true },
   });
   return NextResponse.json({ ok: true, id: campaign.id });

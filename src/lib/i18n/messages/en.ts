@@ -175,5 +175,20 @@ export const en: Messages = {
       deferred:
         "The ledger is the source of truth · commission accrues on payment · payout/settlement later (mock now).",
     },
+    campaigns: {
+      title: "Campaigns Oversight",
+      desc: "All platform campaigns (brand · type · budget · performance).",
+      total: "Campaigns",
+      active: "Active",
+      totalBudget: "Total budgets",
+      colTitle: "Title",
+      colBrand: "Brand",
+      colType: "Type",
+      colStatus: "Status",
+      colBudget: "Budget",
+      colSpent: "Spent",
+      colParticipants: "Participants",
+      colSales: "Sales",
+    },
   },
 };

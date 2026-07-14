@@ -73,6 +73,53 @@ export async function ensureParticipation(
   return { id: p.id, code, link, created: true };
 }
 
+// دعوة مبدع لحملة (INVITED) — يولّد كود/رابط لكن لا يُسنِد حتى يقبل المبدع.
+export async function inviteParticipation(
+  campaignId: string,
+  creatorProfileId: string,
+): Promise<{ id: string; code: string; link: string; created: boolean; status: string }> {
+  const existing = await prisma.campaignParticipation.findUnique({
+    where: { campaignId_creatorProfileId: { campaignId, creatorProfileId } },
+    select: { id: true, uniqueCode: true, uniqueLink: true, status: true },
+  });
+  if (existing) {
+    return {
+      id: existing.id,
+      code: existing.uniqueCode,
+      link: existing.uniqueLink,
+      created: false,
+      status: existing.status,
+    };
+  }
+  const { code, link } = await generateUniqueCodeLink();
+  const p = await prisma.campaignParticipation.create({
+    data: { campaignId, creatorProfileId, uniqueCode: code, uniqueLink: link, status: "INVITED" },
+    select: { id: true },
+  });
+  return { id: p.id, code, link, created: true, status: "INVITED" };
+}
+
+// قبول المبدع للدعوة → ACTIVE (يُفعّل الإسناد). idempotent · ملكية.
+export async function acceptParticipation(
+  participationId: string,
+  creatorProfileId: string,
+): Promise<{ ok: boolean; code?: string; link?: string }> {
+  const p = await prisma.campaignParticipation.findUnique({
+    where: { id: participationId },
+    select: { id: true, creatorProfileId: true, status: true, uniqueCode: true, uniqueLink: true },
+  });
+  if (!p || p.creatorProfileId !== creatorProfileId || p.status === "LEFT") {
+    return { ok: false };
+  }
+  if (p.status !== "ACTIVE") {
+    await prisma.campaignParticipation.update({
+      where: { id: p.id },
+      data: { status: "ACTIVE", joinedAt: new Date() },
+    });
+  }
+  return { ok: true, code: p.uniqueCode, link: p.uniqueLink };
+}
+
 export interface ClickResult {
   participationId: string;
   active: boolean;
@@ -91,12 +138,14 @@ export async function recordClick(
     where: { uniqueCode: code },
     select: {
       id: true,
-      campaign: { select: { status: true } },
+      status: true,
+      campaign: { select: { status: true, type: true } },
       creatorProfile: { select: { username: true } },
     },
   });
   if (!p) return null;
-  const active = p.campaign.status === "ACTIVE";
+  // نشط = الحملة ACTIVE والمبدع قَبِل الدعوة (participation ACTIVE).
+  const active = p.campaign.status === "ACTIVE" && p.status === "ACTIVE";
   if (active && count) {
     await prisma.$transaction([
       prisma.attributionEvent.create({
@@ -107,6 +156,11 @@ export async function recordClick(
         data: { clicks: { increment: 1 } },
       }),
     ]);
+    // حملة الأداء (PERFORMANCE): مستحقّ CPC لكل نقرة محتسَبة.
+    if (p.campaign.type === "PERFORMANCE") {
+      const { accruePerformancePayout } = await import("@/lib/campaign/payout");
+      await accruePerformancePayout(p.id);
+    }
   }
   return {
     participationId: p.id,
@@ -123,16 +177,16 @@ export async function resolveActiveParticipationRef(
   if (cookieVal) {
     const p = await prisma.campaignParticipation.findUnique({
       where: { id: cookieVal },
-      select: { id: true, campaign: { select: { status: true } } },
+      select: { id: true, status: true, campaign: { select: { status: true } } },
     });
-    if (p && p.campaign.status === "ACTIVE") return p.id;
+    if (p && p.status === "ACTIVE" && p.campaign.status === "ACTIVE") return p.id;
   }
   if (code) {
     const p = await prisma.campaignParticipation.findUnique({
       where: { uniqueCode: code.toUpperCase() },
-      select: { id: true, campaign: { select: { status: true } } },
+      select: { id: true, status: true, campaign: { select: { status: true } } },
     });
-    if (p && p.campaign.status === "ACTIVE") return p.id;
+    if (p && p.status === "ACTIVE" && p.campaign.status === "ACTIVE") return p.id;
   }
   return null;
 }

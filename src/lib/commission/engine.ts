@@ -170,6 +170,10 @@ export async function accrueCommission(orderId: string): Promise<void> {
   const { recordSaleAttribution } = await import("@/lib/attribution/engine");
   const attr = await recordSaleAttribution(order);
 
+  // مستحقّ المبدع من الحملة (SALE) — يُسجَّل ويُخصم من الميزانية (idempotent).
+  const { accrueSalePayout } = await import("@/lib/campaign/payout");
+  await accrueSalePayout(order);
+
   const saleType = saleTypeForOrder(order);
   const rules = await prisma.commissionRule.findMany({ where: { isActive: true } });
   const rule = resolveRule(rules as RuleRow[], {
