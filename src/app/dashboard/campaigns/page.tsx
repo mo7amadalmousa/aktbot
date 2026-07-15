@@ -3,11 +3,13 @@ import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { getCreatorParticipations } from "@/lib/attribution/query";
+import { getCreatorUgcData } from "@/lib/campaign/ugc-query";
 import { CopyBtn } from "@/components/brand/brand-actions";
 import { fmtNum } from "@/components/dashboard/analytics-bits";
 import { formatMoney } from "@/lib/payments/money";
 import { PARTICIPATION_STATUS_LABEL } from "@/lib/attribution/query";
 import { ParticipationAccept } from "@/components/dashboard/participation-accept";
+import { UgcCreatorPanel } from "@/components/dashboard/ugc-creator-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +32,10 @@ export default async function CreatorCampaignsPage() {
   });
   if (!profile) redirect("/dashboard");
 
-  const parts = await getCreatorParticipations(profile.id);
+  const [parts, ugc] = await Promise.all([
+    getCreatorParticipations(profile.id),
+    getCreatorUgcData(profile.id),
+  ]);
   const base = linkBase();
 
   return (
@@ -46,6 +51,9 @@ export default async function CreatorCampaignsPage() {
           <div className="space-y-3">
             {parts.map((p) => {
               const invited = p.status === "INVITED";
+              const meta = ugc.metaByCampaign[p.campaignId];
+              const subs = ugc.submissionsByParticipation[p.id] ?? [];
+              const isUgc = meta?.type === "UGC";
               return (
                 <div key={p.id} className="rounded-2xl border border-border bg-card p-4">
                   <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -68,6 +76,30 @@ export default async function CreatorCampaignsPage() {
                         دعتك «{p.brandName}» للانضمام — اقبل لتفعيل رابطك وبدء احتساب مستحقّاتك.
                       </span>
                       <ParticipationAccept participationId={p.id} />
+                      {isUgc && meta ? (
+                        <div className="w-full border-t border-amber-500/20 pt-2 text-xs text-muted-foreground">
+                          <p>
+                            شروط قبل القبول:{" "}
+                            {meta.contentFee != null ? (
+                              <>
+                                أجر كل محتوى مقبول{" "}
+                                <strong className="text-foreground">{formatMoney(meta.contentFee, meta.currency)}</strong>.{" "}
+                              </>
+                            ) : null}
+                            {meta.usageRightsWanted
+                              ? "قد تُطلب حقوق استخدام بأجر منفصل يُتّفق عند الطلب."
+                              : "لا حقوق استخدام مطلوبة."}
+                          </p>
+                          {meta.brief ? <p className="mt-1">البريف: {meta.brief}</p> : null}
+                          {meta.requirements.length > 0 ? (
+                            <ul className="mt-1 list-inside list-disc">
+                              {meta.requirements.map((r, i) => (
+                                <li key={i}>{r}</li>
+                              ))}
+                            </ul>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </div>
                   ) : (
                     <div className="mb-3 flex flex-wrap items-center gap-3 text-sm">
@@ -93,6 +125,11 @@ export default async function CreatorCampaignsPage() {
                       </div>
                     ))}
                   </div>
+
+                  {/* لوحة UGC للمشاركة النشطة: تسليم + مراجعة + حقوق */}
+                  {isUgc && !invited ? (
+                    <UgcCreatorPanel campaignId={p.campaignId} meta={meta} submissions={subs} />
+                  ) : null}
                 </div>
               );
             })}

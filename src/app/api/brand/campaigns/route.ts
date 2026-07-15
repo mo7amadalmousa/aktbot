@@ -69,6 +69,8 @@ export async function POST(req: NextRequest) {
       targetUrl: clean.targetUrl,
       requirements: clean.requirements as object,
       payoutConfig: clean.payoutConfig as object,
+      usageRightsWanted: clean.usageRightsWanted,
+      usageRightsBudget: clean.usageRightsBudget,
     },
     select: { id: true },
   });

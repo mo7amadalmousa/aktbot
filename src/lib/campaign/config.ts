@@ -64,6 +64,9 @@ export interface CleanCampaign {
   targetUrl: string | null;
   requirements: { items: string[] };
   payoutConfig: PayoutConfig;
+  // حقوق الاستخدام (UGC) — شفافية مسبقة للمبدع + سقف مستقلّ.
+  usageRightsWanted: boolean;
+  usageRightsBudget: number | null; // minor
 }
 
 // يبني/يتحقّق payoutConfig حسب النوع (القيَم minor بعملة الحملة).
@@ -116,6 +119,14 @@ export function sanitizeCampaignInput(raw: unknown): CleanCampaign {
     .filter(Boolean)
     .slice(0, 20);
 
+  // حقوق الاستخدام لحملات UGC فقط (شفافية مسبقة).
+  const usageRightsWanted = type === "UGC" && Boolean(c.usageRightsWanted);
+  let usageRightsBudget: number | null = null;
+  if (usageRightsWanted) {
+    const urb = num(c.usageRightsBudget);
+    if (urb !== null && urb > 0) usageRightsBudget = toMinor(urb, currency);
+  }
+
   return {
     type,
     title,
@@ -129,6 +140,8 @@ export function sanitizeCampaignInput(raw: unknown): CleanCampaign {
     targetUrl,
     requirements: { items },
     payoutConfig: buildPayout(type, c, currency),
+    usageRightsWanted,
+    usageRightsBudget,
   };
 }
 

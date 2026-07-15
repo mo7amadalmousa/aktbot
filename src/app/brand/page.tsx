@@ -2,6 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { getBrandOverview, PARTICIPATION_STATUS_LABEL } from "@/lib/attribution/query";
+import { getBrandUgcSubmissions } from "@/lib/campaign/ugc-query";
+import { minUsageFee } from "@/lib/campaign/ugc";
 import { StatCard, fmtNum } from "@/components/dashboard/analytics-bits";
 import { formatMoney } from "@/lib/payments/money";
 import {
@@ -10,6 +12,7 @@ import {
   AddCreatorForm,
   CopyBtn,
 } from "@/components/brand/brand-actions";
+import { UgcBrandPanel } from "@/components/brand/ugc-brand-panel";
 import { Building2, MousePointerClick, ShoppingBag, DollarSign, BadgeCheck } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +32,15 @@ export default async function BrandPage() {
   const data = await getBrandOverview(session.sub);
   if (!data.brand) redirect("/become-brand");
   const base = linkBase();
+
+  // تسليمات UGC لحملات هذه العلامة + الحدّ الأدنى لكل عملة حاضرة.
+  const ugcByCampaign = await getBrandUgcSubmissions(data.brand.id);
+  const ugcCurrencies = [
+    ...new Set(data.campaigns.filter((c) => c.type === "UGC").map((c) => c.currency)),
+  ];
+  const minFeeByCurrency = Object.fromEntries(
+    await Promise.all(ugcCurrencies.map(async (cur) => [cur, await minUsageFee(cur)] as const)),
+  );
 
   return (
     <main className="min-h-dvh w-full bg-muted/20">
@@ -140,6 +152,20 @@ export default async function BrandPage() {
                     )}
 
                     <AddCreatorForm campaignId={c.id} />
+
+                    {/* حملات UGC: تسليمات المحتوى (معاينة محميّة + مراجعة + حقوق) */}
+                    {c.type === "UGC" ? (
+                      <div className="mt-4 border-t border-border pt-3">
+                        <p className="mb-1 text-xs font-semibold text-foreground">
+                          تسليمات المحتوى · مراجعة وحقوق الاستخدام
+                        </p>
+                        <UgcBrandPanel
+                          submissions={ugcByCampaign[c.id] ?? []}
+                          currency={c.currency}
+                          minFee={minFeeByCurrency[c.currency] ?? 0}
+                        />
+                      </div>
+                    ) : null}
                   </div>
                 );
               })}

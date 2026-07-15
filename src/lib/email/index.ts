@@ -399,6 +399,75 @@ ${data.trackingNumber ? `<p>رقم التتبّع: <strong>${data.trackingNumber
   });
 }
 
+// ── UGC: مراجعة المحتوى + طلب حقوق الاستخدام ──────────────────────────
+interface SubmissionReviewData {
+  creatorName: string;
+  creatorEmail: string;
+  campaignTitle: string;
+  brandName: string;
+  statusLabel: string; // مقبول | مرفوض | طلب تعديل
+  note: string | null;
+  payoutLabel: string | null; // مستحقّ المحتوى عند القبول
+}
+
+export async function sendSubmissionReviewedEmail(
+  data: SubmissionReviewData,
+): Promise<void> {
+  await getEmailAdapter().send({
+    to: data.creatorEmail,
+    subject: `AktBot — نتيجة مراجعة محتواك: ${data.campaignTitle}`,
+    text: [
+      `مرحباً ${data.creatorName}،`,
+      "",
+      `راجعت «${data.brandName}» محتواك في حملة «${data.campaignTitle}».`,
+      `النتيجة: ${data.statusLabel}.`,
+      data.payoutLabel ? `مستحقّك عن هذا المحتوى: ${data.payoutLabel}.` : "",
+      data.note ? `ملاحظة العلامة: ${data.note}` : "",
+      "",
+      "راجع حملاتك من لوحة التحكّم.",
+      `— ${FROM}`,
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    html: `<p>مرحباً ${data.creatorName}،</p>
+<p>راجعت «<strong>${data.brandName}</strong>» محتواك في حملة «<strong>${data.campaignTitle}</strong>».</p>
+<p>النتيجة: <strong>${data.statusLabel}</strong>.${data.payoutLabel ? `<br/>مستحقّك عن هذا المحتوى: <strong>${data.payoutLabel}</strong>.` : ""}${data.note ? `<br/>ملاحظة العلامة: ${data.note}` : ""}</p>
+<p style="color:#666">راجع حملاتك من لوحة التحكّم.<br/>— ${FROM}</p>`,
+  });
+}
+
+interface UsageRightRequestData {
+  creatorName: string;
+  creatorEmail: string;
+  campaignTitle: string;
+  brandName: string;
+  feeLabel: string;
+  durationDays: number;
+  scopeLabel: string;
+}
+
+export async function sendUsageRightRequestEmail(
+  data: UsageRightRequestData,
+): Promise<void> {
+  await getEmailAdapter().send({
+    to: data.creatorEmail,
+    subject: `AktBot — طلب حقوق استخدام: ${data.campaignTitle}`,
+    text: [
+      `مرحباً ${data.creatorName}،`,
+      "",
+      `طلبت «${data.brandName}» حقوق استخدام لمحتواك في حملة «${data.campaignTitle}».`,
+      `الأجر: ${data.feeLabel} · المدّة: ${data.durationDays} يوماً · النطاق: ${data.scopeLabel}.`,
+      "",
+      "راجع الطلب واقبله أو ارفضه من لوحة التحكّم — أنت ترى الشروط كاملة قبل القبول.",
+      `— ${FROM}`,
+    ].join("\n"),
+    html: `<p>مرحباً ${data.creatorName}،</p>
+<p>طلبت «<strong>${data.brandName}</strong>» حقوق استخدام لمحتواك في حملة «<strong>${data.campaignTitle}</strong>».</p>
+<p>الأجر: <strong>${data.feeLabel}</strong> · المدّة: <strong>${data.durationDays}</strong> يوماً · النطاق: ${data.scopeLabel}.</p>
+<p style="color:#666">راجع الطلب واقبله أو ارفضه من لوحة التحكّم.<br/>— ${FROM}</p>`,
+  });
+}
+
 // ── حجز المواعيد (تأكيد/إلغاء) ────────────────────────────────────────
 interface BookingEmailData {
   bookingId: string;

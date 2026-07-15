@@ -723,18 +723,62 @@ async function main() {
     },
   });
 
-  // حملة UGC (بنية · بلا احتساب تلقائيّ — القبول في ن22).
-  await prisma.campaign.create({
+  // حملة UGC كاملة (C6): تسليم → مراجعة → مستحقّ + حقوق استخدام بأجر منفصل.
+  const ugcCampaign = await prisma.campaign.create({
     data: {
       brandId: brandProfile.id,
       title: "تحدّي المحتوى الخريفيّ (UGC)",
       type: "UGC",
       status: "ACTIVE",
-      description: "أنشئي فيديو UGC واكسبي مبلغاً لكل محتوى مقبول.",
+      description: "أنشئي فيديو/صورة UGC واكسبي مبلغاً لكل محتوى مقبول.",
+      brief: "أنشئي محتوى يعرض روتين الخريف مع منتجاتنا.",
       currency: "USD",
-      budgetAmount: 100000, // ‏$1000
-      payoutConfig: { fixedPerContent: 5000 }, // ‏$50 لكل محتوى
+      budgetAmount: 100000, // ‏$1000 (ميزانية المحتوى)
+      payoutConfig: { fixedPerContent: 5000 }, // ‏$50 لكل محتوى مقبول
+      requirements: { items: ["إضاءة جيّدة", "ذكر العلامة"] },
+      usageRightsWanted: true,
+      usageRightsBudget: 20000, // ‏$200 (ميزانية الحقوق المنفصلة)
     },
+    select: { id: true },
+  });
+  // لينا مشاركة نشطة في حملة UGC (تستطيع التسليم).
+  const ugcPart = await prisma.campaignParticipation.create({
+    data: {
+      campaignId: ugcCampaign.id,
+      creatorProfileId: lina.profileId,
+      uniqueCode: "LINAUGC",
+      uniqueLink: "/r/LINAUGC",
+      status: "ACTIVE",
+      joinedAt: new Date(),
+    },
+    select: { id: true },
+  });
+  // تسليم تجريبيّ (صورة PNG صغيرة في التخزين الخاصّ) — SUBMITTED للمراجعة.
+  const UGC_KEY = "seed-ugc-lina.png";
+  await writePrivateFile(
+    UGC_KEY,
+    Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+      "base64",
+    ),
+  );
+  await prisma.contentSubmission.create({
+    data: {
+      participationId: ugcPart.id,
+      campaignId: ugcCampaign.id,
+      creatorProfileId: lina.profileId,
+      type: "IMAGE",
+      assetKey: UGC_KEY,
+      caption: "منشور تجريبيّ لتحدّي الخريف",
+      status: "SUBMITTED",
+    },
+  });
+
+  // إعداد المنصّة: الحدّ الأدنى لأجر حقوق الاستخدام per-currency (يضمن العمولة).
+  await prisma.platformSetting.upsert({
+    where: { key: "usage_rights_min_fee" },
+    update: { value: { USD: 500, SAR: 2000 } },
+    create: { key: "usage_rights_min_fee", value: { USD: 500, SAR: 2000 } },
   });
 
   console.log("✓ seeded:", lina, sara, linaProduct);
