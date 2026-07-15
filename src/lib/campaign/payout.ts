@@ -1,15 +1,14 @@
 import { prisma } from "@/lib/prisma";
-import { asRecord } from "@/lib/public/block-config";
-import { campaignRemaining, computeSalePayout, type PayoutConfig } from "@/lib/campaign/config";
+import { campaignRemaining, computeSalePayout } from "@/lib/campaign/config";
 
-// ── احتساب مستحقات المبدع من الحملة (سجلّ CampaignPayout مصدر الحقيقة) ──
-// المستحقّ بعملة الحملة · minor int · idempotent · لا يتجاوز الميزانية.
+// ── احتساب مستحقات المبدع من مكوّنات الحملة (CampaignPayout مصدر الحقيقة) ──
+// كل مستحقّ يُخصم من ميزانية مكوّنه فقط (لا تسرّب) · minor · idempotent · قصّ للمتبقّي.
 
 function isUnique(e: unknown): boolean {
   return Boolean(e && typeof e === "object" && (e as { code?: string }).code === "P2002");
 }
 
-// SALE: عند بيع مُسنَد مؤكّد (PAID). عملة البيع يجب أن تساوي عملة الحملة (لا تحويل).
+// SALE: عند بيع مُسنَد مؤكّد (PAID). عملة البيع = عملة الحملة (لا تحويل).
 export async function accrueSalePayout(order: {
   id: string;
   amount: number;
@@ -27,20 +26,21 @@ export async function accrueSalePayout(order: {
       campaign: {
         select: {
           id: true,
-          type: true,
           status: true,
           currency: true,
-          budgetAmount: true,
-          spentAmount: true,
-          payoutConfig: true,
+          saleEnabled: true,
+          saleBudget: true,
+          saleSpent: true,
+          saleCreatorBps: true,
+          saleFixedPerSale: true,
         },
       },
     },
   });
   if (!p) return;
   const c = p.campaign;
-  // الحملة نشطة · النوع SALE · المبدع منضمّ · نفس العملة (لا تحويل).
-  if (c.type !== "SALE" || c.status !== "ACTIVE" || p.status !== "ACTIVE") return;
+  // مكوّن البيع مُفعّل · الحملة نشطة · المبدع منضمّ · نفس العملة.
+  if (!c.saleEnabled || c.status !== "ACTIVE" || p.status !== "ACTIVE") return;
   if (!c.currency || c.currency !== order.currency) return;
 
   // idempotency: مستحقّ واحد لكل طلب (orderId فريد).
@@ -50,10 +50,10 @@ export async function accrueSalePayout(order: {
   });
   if (existing) return;
 
-  const computed = computeSalePayout(order.amount, asRecord(c.payoutConfig) as PayoutConfig);
-  const remaining = campaignRemaining(c.budgetAmount, c.spentAmount);
+  const computed = computeSalePayout(order.amount, c.saleCreatorBps, c.saleFixedPerSale);
+  const remaining = campaignRemaining(c.saleBudget, c.saleSpent);
   const amount = Math.min(computed, remaining);
-  if (amount <= 0) return; // الميزانية مستنفدة → لا مستحقّ يتجاوزها
+  if (amount <= 0) return; // ميزانية البيع مستنفدة → لا مستحقّ يتجاوزها
 
   try {
     await prisma.$transaction([
@@ -75,7 +75,7 @@ export async function accrueSalePayout(order: {
       }),
       prisma.campaign.update({
         where: { id: c.id },
-        data: { spentAmount: { increment: amount } },
+        data: { saleSpent: { increment: amount }, spentAmount: { increment: amount } },
       }),
     ]);
   } catch (e) {
@@ -94,24 +94,24 @@ export async function accruePerformancePayout(participationId: string): Promise<
       campaign: {
         select: {
           id: true,
-          type: true,
           status: true,
           currency: true,
-          budgetAmount: true,
-          spentAmount: true,
-          payoutConfig: true,
+          performanceEnabled: true,
+          performanceBudget: true,
+          performanceSpent: true,
+          performanceCpc: true,
         },
       },
     },
   });
   if (!p) return;
   const c = p.campaign;
-  if (c.type !== "PERFORMANCE" || c.status !== "ACTIVE" || p.status !== "ACTIVE") return;
+  if (!c.performanceEnabled || c.status !== "ACTIVE" || p.status !== "ACTIVE") return;
   if (!c.currency) return;
 
-  const cpc = (asRecord(c.payoutConfig) as PayoutConfig).cpcMinor ?? 0;
+  const cpc = c.performanceCpc ?? 0;
   if (cpc <= 0) return;
-  const remaining = campaignRemaining(c.budgetAmount, c.spentAmount);
+  const remaining = campaignRemaining(c.performanceBudget, c.performanceSpent);
   const amount = Math.min(cpc, remaining);
   if (amount <= 0) return;
 
@@ -133,7 +133,7 @@ export async function accruePerformancePayout(participationId: string): Promise<
     }),
     prisma.campaign.update({
       where: { id: c.id },
-      data: { spentAmount: { increment: amount } },
+      data: { performanceSpent: { increment: amount }, spentAmount: { increment: amount } },
     }),
   ]);
 }

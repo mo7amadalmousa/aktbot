@@ -2,13 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth/session";
 import { checkUploadRate } from "@/lib/storage/rate-limit";
-import { readUgcUpload, UploadError } from "@/lib/campaign/upload";
+import { streamUploadToPrivate, UploadError } from "@/lib/campaign/stream-upload";
 import { deletePrivateFile } from "@/lib/storage/private-files";
+import { REVIEW_DEADLINE_DAYS } from "@/lib/campaign/ugc";
+import { sanitizeCaption } from "@/lib/campaign/ugc-input";
 
 export const runtime = "nodejs";
 
-// تسليم المبدع لمحتوى حملة UGC → تخزين خاصّ + ContentSubmission (SUBMITTED).
-// حرّاس: مشاركة نشطة (قَبِل الدعوة) · حملة UGC نشطة غير منتهية · أمان الرفع.
+// تسليم المبدع لمحتوى (فيديو/صورة) لمكوّن المحتوى → رفع متدفّق لتخزين خاصّ.
+// حرّاس: مشاركة ACTIVE · مكوّن المحتوى مُفعّل · الحملة نشطة غير منتهية · magic bytes.
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -26,13 +28,12 @@ export async function POST(
   });
   if (!profile) return NextResponse.json({ ok: false, error: "لا ملف مبدع." }, { status: 403 });
 
-  // ملكية + أهليّة: المبدع مشارك نشط في هذه الحملة (قَبِل الدعوة).
   const participation = await prisma.campaignParticipation.findUnique({
     where: { campaignId_creatorProfileId: { campaignId, creatorProfileId: profile.id } },
     select: {
       id: true,
       status: true,
-      campaign: { select: { type: true, status: true, endAt: true } },
+      campaign: { select: { contentEnabled: true, status: true, endAt: true } },
     },
   });
   if (!participation) {
@@ -42,8 +43,8 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "اقبل الدعوة أوّلاً لتسليم المحتوى." }, { status: 403 });
   }
   const c = participation.campaign;
-  if (c.type !== "UGC") {
-    return NextResponse.json({ ok: false, error: "التسليم متاح لحملات المحتوى (UGC) فقط." }, { status: 422 });
+  if (!c.contentEnabled) {
+    return NextResponse.json({ ok: false, error: "هذه الحملة لا تطلب محتوى." }, { status: 422 });
   }
   if (c.status !== "ACTIVE") {
     return NextResponse.json({ ok: false, error: "الحملة غير نشطة." }, { status: 422 });
@@ -52,9 +53,11 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "انتهت الحملة — لا تسليم جديد." }, { status: 422 });
   }
 
-  let uploaded;
+  const caption = sanitizeCaption(req.nextUrl.searchParams.get("caption"));
+
+  let up;
   try {
-    uploaded = await readUgcUpload(await req.formData());
+    up = await streamUploadToPrivate(req.body);
   } catch (e) {
     if (e instanceof UploadError) {
       return NextResponse.json({ ok: false, error: e.message }, { status: e.status });
@@ -62,23 +65,24 @@ export async function POST(
     throw e;
   }
 
+  const deadline = new Date(Date.now() + REVIEW_DEADLINE_DAYS * 86400000);
   try {
     const sub = await prisma.contentSubmission.create({
       data: {
         participationId: participation.id,
         campaignId,
         creatorProfileId: profile.id,
-        type: uploaded.type,
-        assetKey: uploaded.assetKey,
-        caption: uploaded.caption,
+        type: up.type,
+        assetKey: up.assetKey,
+        caption,
         status: "SUBMITTED",
+        reviewDeadlineAt: deadline,
       },
       select: { id: true },
     });
     return NextResponse.json({ ok: true, submissionId: sub.id });
   } catch (e) {
-    // فشل الحفظ بعد كتابة الملف → نظّف الملف الخاصّ (لا يتيمة).
-    await deletePrivateFile(uploaded.assetKey);
+    await deletePrivateFile(up.assetKey); // تنظيف الملف عند فشل الحفظ (لا يتيمة)
     throw e;
   }
 }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth/session";
-import { sanitizeCampaignInput, CampaignError } from "@/lib/campaign/config";
+import { sanitizeCampaignInput, campaignComponentData, CampaignError } from "@/lib/campaign/config";
 import type { CampaignType, CampaignStatus } from "@/generated/prisma/enums";
 
 export const runtime = "nodejs";
@@ -63,14 +63,11 @@ export async function POST(req: NextRequest) {
       brief: clean.brief,
       coverImage: clean.coverImage,
       currency: clean.currency,
-      budgetAmount: clean.budgetAmount,
       startAt: clean.startAt,
       endAt: clean.endAt,
       targetUrl: clean.targetUrl,
       requirements: clean.requirements as object,
-      payoutConfig: clean.payoutConfig as object,
-      usageRightsWanted: clean.usageRightsWanted,
-      usageRightsBudget: clean.usageRightsBudget,
+      ...campaignComponentData(clean),
     },
     select: { id: true },
   });

@@ -11,17 +11,23 @@ function back(req: NextRequest, error: string) {
   return NextResponse.redirect(url, { status: 303 });
 }
 
-// وجهة آمنة بعد الدخول (تمنع open-redirect: مسارات داخليّة فقط).
-function safeNext(raw: string | null): string {
-  if (raw && raw.startsWith("/") && !raw.startsWith("//")) return raw;
+// S36: وجهة الدخول حسب الدور — يمنع وصول العلامة/الأدمن لـ/dashboard (خطأ «لا ملف مبدع»).
+function landingFor(role: string): string {
+  if (role === "BRAND") return "/brand";
+  if (role === "ADMIN") return "/admin";
   return "/dashboard";
+}
+
+// وجهة آمنة صريحة (تمنع open-redirect: مسارات داخليّة فقط)، أو null لاعتماد الدور.
+function explicitNext(raw: string): string | null {
+  return raw.startsWith("/") && !raw.startsWith("//") ? raw : null;
 }
 
 export async function POST(req: NextRequest) {
   const form = await req.formData();
   const email = String(form.get("email") ?? "");
   const password = String(form.get("password") ?? "");
-  const next = safeNext(String(form.get("next") ?? "") || null);
+  const rawNext = String(form.get("next") ?? "");
 
   const result = await authProviders.credentials!.authenticate({
     email,
@@ -39,6 +45,9 @@ export async function POST(req: NextRequest) {
     email: result.email,
     role: result.role,
   });
+
+  // وجهة صريحة (من صفحة محميّة) تُحترَم؛ وإلا التوجيه حسب الدور.
+  const next = explicitNext(rawNext) ?? landingFor(result.role);
 
   const res = NextResponse.redirect(new URL(next, req.url), { status: 303 });
   res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());

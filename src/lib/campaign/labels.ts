@@ -4,6 +4,7 @@
 export const SUBMISSION_STATUS_LABEL: Record<string, string> = {
   SUBMITTED: "بانتظار المراجعة",
   APPROVED: "مقبول",
+  AUTO_APPROVED: "مقبول تلقائياً",
   REJECTED: "مرفوض",
   REVISION_REQUESTED: "طلب تعديل",
 };
@@ -16,7 +17,9 @@ export const SUBMISSION_TYPE_LABEL: Record<string, string> = {
 export const USAGE_RIGHT_STATUS_LABEL: Record<string, string> = {
   NOT_REQUESTED: "لم تُطلب",
   REQUESTED: "بانتظار ردّ المبدع",
-  ACCEPTED: "مقبولة",
+  ACCEPTED: "سارية",
+  ACTIVE: "سارية",
+  EXPIRING_SOON: "قرب الانتهاء",
   DECLINED: "مرفوضة",
   EXPIRED: "منتهية",
 };

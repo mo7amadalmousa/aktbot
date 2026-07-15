@@ -10,6 +10,7 @@ export const SALE_TYPE_LABEL: Record<string, string> = {
   STORE_PHYSICAL: "منتج فيزيائيّ",
   BOOKING: "حجز موعد",
   CAMPAIGN: "حملة",
+  CONTENT: "محتوى UGC",
   USAGE_RIGHTS: "حقوق استخدام",
 };
 

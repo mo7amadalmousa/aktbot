@@ -498,8 +498,9 @@ enum SaleType {
   STORE_COURSE
   STORE_PHYSICAL
   BOOKING
-  CAMPAIGN // لاحقاً
-  USAGE_RIGHTS // لاحقاً
+  CAMPAIGN // إسناد حملة عامّ
+  CONTENT // أجر إنتاج محتوى UGC (مكوّن المحتوى)
+  USAGE_RIGHTS // أجر حقوق استخدام محتوى
 }
 
 enum LedgerStatus {
@@ -609,9 +610,25 @@ model Campaign {
   payoutConfig Json?
   spentAmount Int            @default(0) // مجموع مستحقات المحتوى/المبيعات (حماية الميزانية O(1))
   // حقوق الاستخدام (UGC C6) — additive · ميزانية منفصلة عن ميزانية المحتوى.
-  usageRightsWanted Boolean  @default(false) // شفافية مسبقة: هل تُطلب حقوق استخدام؟
+  usageRightsWanted Boolean  @default(false) // = usageRightsEnabled (مكوّن الحقوق)
   usageRightsBudget Int? // minor — سقف مستقلّ لأجور الحقوق
   usageRightsSpent  Int      @default(0) // مجموع أجور الحقوق المقبولة (حماية O(1))
+  // ── مكوّنات الحملة القابلة للتركيب (additive) — كلٌّ بميزانيّته (لا تسرّب) ──
+  // الحملات القائمة تُرحَّل من type إلى المكوّن المكافئ في الهجرة (backfill · لا فقد).
+  contentEnabled     Boolean @default(false)
+  contentBudget      Int? // minor — ميزانية إنتاج المحتوى
+  contentSpent       Int     @default(0)
+  contentPerItem     Int? // أجر المحتوى المقبول (minor)
+  contentCount       Int? // عدد المحتوى المطلوب (اختياريّ · شفافية)
+  saleEnabled        Boolean @default(false)
+  saleBudget         Int? // minor — ميزانية مستحقّات البيع
+  saleSpent          Int     @default(0)
+  saleCreatorBps     Int? // نسبة المبدع (bps)
+  saleFixedPerSale   Int? // مبلغ ثابت لكل بيعة (minor)
+  performanceEnabled Boolean @default(false)
+  performanceBudget  Int? // minor — ميزانية الأداء
+  performanceSpent   Int     @default(0)
+  performanceCpc     Int? // سعر النقرة (minor)
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
@@ -685,9 +702,10 @@ model AttributionEvent {
 
 // ── مستحقات المبدع من الحملات (سجلّ — مصدر الحقيقة، نفس فلسفة Ledger) ──
 enum PayoutType {
-  SALE // نسبة/مبلغ من بيعة مُسنَدة
-  PERFORMANCE // لكل نقرة (CPC)
-  UGC // لكل محتوى مقبول (يُحتسب عند قبول العلامة)
+  SALE // نسبة/مبلغ من بيعة مُسنَدة (مكوّن البيع)
+  PERFORMANCE // لكل نقرة (CPC — مكوّن الأداء)
+  UGC // (legacy) لكل محتوى مقبول — استُبدل بـCONTENT
+  CONTENT // أجر إنتاج محتوى مقبول (مكوّن المحتوى)
   USAGE_RIGHTS // أجر حقّ استخدام محتوى مقبول (منفصل عن أجر المحتوى)
 }
 
@@ -708,7 +726,8 @@ model CampaignPayout {
   currency         String
   orderId          String?      @unique // SALE: idempotency (null للأنواع الأخرى)
   // UGC/USAGE_RIGHTS (additive): مصدر التسليم + الأجر الإجماليّ وعمولة المنصّة منه.
-  submissionId     String? // التسليم المرتبط (UGC/الحقوق) — null لـSALE/PERFORMANCE
+  submissionId     String? // التسليم المرتبط (المحتوى/الحقوق) — null لـSALE/PERFORMANCE
+  usageRightId     String?      @unique // idempotency لمستحقّ الحقوق (يسمح بعدّة تجديدات/تسليم)
   grossAmount      Int? // أجر العلامة الإجماليّ قبل عمولة المنصّة (F) — null للقديم
   commissionAmount Int          @default(0) // عمولة المنصّة (C) — 0 لـSALE/PERFORMANCE
   status           PayoutStatus @default(ACCRUED)
@@ -720,7 +739,6 @@ model CampaignPayout {
   creatorProfile CreatorProfile        @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
   submission     ContentSubmission?    @relation(fields: [submissionId], references: [id], onDelete: Cascade)
 
-  @@unique([submissionId, type]) // مستحقّ واحد لكل (تسليم، نوع) — منع دفع مزدوج
   @@index([campaignId])
   @@index([participationId])
   @@index([creatorProfileId])
@@ -737,8 +755,9 @@ enum SubmissionType {
 enum SubmissionStatus {
   SUBMITTED // بانتظار مراجعة العلامة
   APPROVED // مقبول → مستحقّ محتوى للمبدع
-  REJECTED // مرفوض → لا مستحقّ
-  REVISION_REQUESTED // طلب تعديل → يعيد المبدع التسليم
+  AUTO_APPROVED // قُبل تلقائياً (انقضت مهلة المراجعة) → مستحقّ للمبدع
+  REJECTED // مرفوض → لا مستحقّ · المحتوى محجوب لا يُستخدم
+  REVISION_REQUESTED // طلب تعديل (مرّة واحدة) → يعيد المبدع التسليم
 }
 
 // تسليم المبدع لمحتوى حملة UGC. الملف في تخزين خاصّ (assetKey) لا يُخدَم عاماً؛
@@ -754,6 +773,8 @@ model ContentSubmission {
   caption          String?
   status           SubmissionStatus @default(SUBMITTED)
   reviewNote       String?
+  revisionCount    Int              @default(0) // ≤ 1: طلب تعديل واحد ثم قرار نهائيّ
+  reviewDeadlineAt DateTime? // مهلة المراجعة → قبول تلقائيّ بعدها (يحمي المبدع)
   reviewedAt       DateTime?
   createdAt        DateTime         @default(now())
 
@@ -761,7 +782,7 @@ model ContentSubmission {
   campaign       Campaign              @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   creatorProfile CreatorProfile        @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
   payouts        CampaignPayout[]
-  usageRight     UsageRight?
+  usageRights    UsageRight[] // سلسلة تجديد (الأحدث = الحاليّ)
 
   @@index([participationId])
   @@index([campaignId])
@@ -772,9 +793,11 @@ model ContentSubmission {
 enum UsageRightStatus {
   NOT_REQUESTED // لا صفّ (حالة مفاهيميّة)
   REQUESTED // طلبت العلامة الحقوق — بانتظار ردّ المبدع
-  ACCEPTED // قبِل المبدع — سارية بمدّة
+  ACCEPTED // (legacy) قبِل المبدع — استُبدل بـACTIVE
+  ACTIVE // سارية ضمن المدّة
+  EXPIRING_SOON // قربت النهاية (نافذة تنبيه التجديد)
   DECLINED // رفض المبدع
-  EXPIRED // انتهت مدّة السريان
+  EXPIRED // انتهت المدّة (لا استخدام إعلانيّ بعدها)
 }
 
 enum UsageScope {
@@ -786,7 +809,8 @@ enum UsageScope {
 // حقّ استخدام لمحتوى مقبول — أجر منفصل فوق الحدّ الأدنى للمنصّة (يضمن العمولة).
 model UsageRight {
   id           String           @id @default(cuid())
-  submissionId String           @unique
+  // غير فريد: سلسلة تجديد (حقوق متعدّدة لكل تسليم عبر الزمن).
+  submissionId String
   status       UsageRightStatus @default(REQUESTED)
   feeAmount    Int // minor — أجر الحقوق بعملة الحملة (≥ الحدّ الأدنى)
   currency     String
@@ -797,11 +821,14 @@ model UsageRight {
   respondedAt  DateTime? // وقت قبول/رفض المبدع
   startAt      DateTime? // بداية السريان (عند القبول)
   endAt        DateTime? // نهاية السريان (عند القبول)
+  renewedFromId String? // الحقّ السابق في سلسلة التجديد (دخل متكرّر · لا تعديل للقديم)
   createdAt    DateTime         @default(now())
 
   submission ContentSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
 
+  @@index([submissionId])
   @@index([status])
+  @@index([renewedFromId])
 }
 
 // إعدادات المنصّة (key/value مرن) — الحدّ الأدنى لأجر الحقوق لكل عملة يُخزَّن هنا.

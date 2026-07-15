@@ -6,71 +6,77 @@ import { Plus, Loader2, UserPlus, Copy, Check } from "lucide-react";
 import { Field, TextInput, TextArea } from "@/components/dashboard/field";
 import { currencyList, minorStep } from "@/lib/payments/money";
 
-const TYPE_HINT: Record<string, string> = {
-  SALE: "المبدع يكسب نسبة/مبلغاً من كل بيعة عبر رابطه.",
-  PERFORMANCE: "المبدع يكسب مبلغاً لكل نقرة (CPC).",
-  UGC: "المبدع يسلّم محتوى، وتراجعينه؛ يكسب مبلغاً لكل محتوى مقبول، وقد تُطلب حقوق استخدام بأجر منفصل.",
-};
-
-// نموذج إنشاء حملة كامل — النوع + الميزانية + المدّة + الشروط + إعداد الدفع.
+// ── نموذج إنشاء حملة قابلة للتركيب — مكوّنات اختياريّة تُفعَّل معاً ────────
+// كل مكوّن بميزانيّته (لا تسرّب). الحقول تظهر عند تفعيل المكوّن.
 export function NewCampaignForm() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [f, setF] = useState({
     title: "",
-    type: "SALE",
     currency: "USD",
-    budget: "",
     startAt: "",
     endAt: "",
     brief: "",
-    targetUrl: "",
     requirements: "",
-    // الدفع حسب النوع
-    creatorPercent: "20", // SALE (نسبة المبدع %)
-    cpc: "0.10", // PERFORMANCE (لكل نقرة)
-    fixedPerContent: "10", // UGC
-    // حقوق الاستخدام (UGC)
-    usageRightsWanted: false,
-    usageRightsBudget: "",
     active: true,
+    // المحتوى
+    contentEnabled: true,
+    contentPerItem: "50",
+    contentBudget: "1000",
+    contentCount: "",
+    // حقوق الاستخدام
+    usageRightsEnabled: false,
+    usageRightsBudget: "200",
+    // البيع
+    saleEnabled: false,
+    creatorPercent: "20",
+    saleBudget: "500",
+    targetUrl: "",
+    // الأداء
+    performanceEnabled: false,
+    cpc: "0.10",
+    performanceBudget: "300",
   });
   const set = (k: string, v: string | boolean) => setF((s) => ({ ...s, [k]: v }));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const num = (v: string) => (v ? Number(v) : undefined);
+
   const create = async () => {
     if (!f.title.trim()) return setError("العنوان مطلوب.");
+    if (!f.contentEnabled && !f.usageRightsEnabled && !f.saleEnabled && !f.performanceEnabled) {
+      return setError("فعّل مكوّناً واحداً على الأقلّ.");
+    }
     setBusy(true);
     setError(null);
-    const payout: Record<string, number> =
-      f.type === "SALE"
-        ? { creatorBps: Math.round(Number(f.creatorPercent) * 100) }
-        : f.type === "PERFORMANCE"
-          ? { cpc: Number(f.cpc) }
-          : { fixedPerContent: Number(f.fixedPerContent) };
     const res = await fetch("/api/brand/campaigns", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         title: f.title,
-        type: f.type,
         status: f.active ? "ACTIVE" : "DRAFT",
         currency: f.currency,
-        budget: f.budget ? Number(f.budget) : undefined,
         startAt: f.startAt || undefined,
         endAt: f.endAt || undefined,
         brief: f.brief,
-        targetUrl: f.type === "SALE" ? f.targetUrl : undefined,
         requirements: f.requirements
           ? f.requirements.split("\n").map((s) => s.trim()).filter(Boolean)
           : [],
-        usageRightsWanted: f.type === "UGC" ? f.usageRightsWanted : undefined,
-        usageRightsBudget:
-          f.type === "UGC" && f.usageRightsWanted && f.usageRightsBudget
-            ? Number(f.usageRightsBudget)
-            : undefined,
-        ...payout,
+        // المكوّنات
+        contentEnabled: f.contentEnabled,
+        contentPerItem: f.contentEnabled ? num(f.contentPerItem) : undefined,
+        contentBudget: f.contentEnabled ? num(f.contentBudget) : undefined,
+        contentCount: f.contentEnabled ? num(f.contentCount) : undefined,
+        usageRightsEnabled: f.usageRightsEnabled,
+        usageRightsBudget: f.usageRightsEnabled ? num(f.usageRightsBudget) : undefined,
+        saleEnabled: f.saleEnabled,
+        saleCreatorBps: f.saleEnabled ? num(f.creatorPercent) : undefined,
+        saleBudget: f.saleEnabled ? num(f.saleBudget) : undefined,
+        targetUrl: f.saleEnabled ? f.targetUrl : undefined,
+        performanceEnabled: f.performanceEnabled,
+        performanceCpc: f.performanceEnabled ? num(f.cpc) : undefined,
+        performanceBudget: f.performanceEnabled ? num(f.performanceBudget) : undefined,
       }),
     });
     const d = await res.json().catch(() => ({ ok: false }));
@@ -91,24 +97,27 @@ export function NewCampaignForm() {
       </button>
     );
   }
+
+  const step = minorStep(f.currency);
+  const Toggle = ({ k, label }: { k: string; label: string }) => (
+    <label className="flex items-center gap-2 text-sm font-semibold text-foreground">
+      <input
+        type="checkbox"
+        checked={f[k as keyof typeof f] as boolean}
+        onChange={(e) => set(k, e.target.checked)}
+        className="size-4 accent-[var(--primary,#278A8F)]"
+      />
+      {label}
+    </label>
+  );
+
   return (
     <div className="mt-3 space-y-3 rounded-2xl border border-border bg-card p-4">
       <Field label="عنوان الحملة">
         <TextInput value={f.title} onChange={(v) => set("title", v)} placeholder="مثال: إطلاق الصيف" />
       </Field>
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="النوع">
-          <select
-            value={f.type}
-            onChange={(e) => set("type", e.target.value)}
-            className="h-9 w-full rounded-lg border border-input bg-background px-2 text-sm text-foreground"
-          >
-            <option value="SALE">مبيعات (SALE)</option>
-            <option value="PERFORMANCE">أداء (PERFORMANCE)</option>
-            <option value="UGC">محتوى (UGC)</option>
-          </select>
-        </Field>
+      <div className="grid gap-3 sm:grid-cols-3">
         <Field label="العملة">
           <select
             value={f.currency}
@@ -122,36 +131,6 @@ export function NewCampaignForm() {
             ))}
           </select>
         </Field>
-      </div>
-
-      <p className="rounded-lg bg-muted/40 p-2 text-[11px] text-muted-foreground">{TYPE_HINT[f.type]}</p>
-
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Field label="الميزانية">
-          <TextInput type="number" step={minorStep(f.currency)} value={f.budget} onChange={(v) => set("budget", v)} placeholder="500" />
-        </Field>
-        {f.type === "SALE" ? (
-          <Field label="نسبة المبدع %">
-            <TextInput type="number" value={f.creatorPercent} onChange={(v) => set("creatorPercent", v)} placeholder="20" />
-          </Field>
-        ) : f.type === "PERFORMANCE" ? (
-          <Field label="سعر النقرة (CPC)">
-            <TextInput type="number" step={minorStep(f.currency)} value={f.cpc} onChange={(v) => set("cpc", v)} placeholder="0.10" />
-          </Field>
-        ) : (
-          <Field label="لكل محتوى مقبول">
-            <TextInput type="number" step={minorStep(f.currency)} value={f.fixedPerContent} onChange={(v) => set("fixedPerContent", v)} placeholder="10" />
-          </Field>
-        )}
-        <Field label="نشر مباشرة؟">
-          <label className="flex h-9 items-center gap-2 text-sm text-foreground">
-            <input type="checkbox" checked={f.active} onChange={(e) => set("active", e.target.checked)} className="size-4 accent-[var(--primary,#278A8F)]" />
-            {f.active ? "نشطة" : "مسودّة"}
-          </label>
-        </Field>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2">
         <Field label="من (اختياريّ)">
           <input type="date" value={f.startAt} onChange={(e) => set("startAt", e.target.value)} className="h-9 w-full rounded-lg border border-input bg-background px-2 text-sm text-foreground" />
         </Field>
@@ -160,11 +139,79 @@ export function NewCampaignForm() {
         </Field>
       </div>
 
-      {f.type === "SALE" ? (
-        <Field label="وجهة الرابط (اختياريّ)">
-          <TextInput type="url" value={f.targetUrl} onChange={(v) => set("targetUrl", v)} placeholder="https://…" />
-        </Field>
-      ) : null}
+      <p className="rounded-lg bg-muted/40 p-2 text-[11px] text-muted-foreground">
+        فعّل مكوّناً أو أكثر — كلٌّ بميزانيّته المنفصلة (لا تسرّب بينها).
+      </p>
+
+      {/* مكوّن المحتوى */}
+      <div className="space-y-2 rounded-xl border border-border bg-muted/10 p-3">
+        <Toggle k="contentEnabled" label="محتوى UGC (تسليم + مراجعة)" />
+        {f.contentEnabled ? (
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Field label="أجر المحتوى المقبول">
+              <TextInput type="number" step={step} value={f.contentPerItem} onChange={(v) => set("contentPerItem", v)} placeholder="50" />
+            </Field>
+            <Field label="ميزانية المحتوى">
+              <TextInput type="number" step={step} value={f.contentBudget} onChange={(v) => set("contentBudget", v)} placeholder="1000" />
+            </Field>
+            <Field label="عدد المطلوب (اختياريّ)">
+              <TextInput type="number" value={f.contentCount} onChange={(v) => set("contentCount", v)} placeholder="10" />
+            </Field>
+          </div>
+        ) : null}
+      </div>
+
+      {/* مكوّن حقوق الاستخدام (يتطلّب المحتوى) */}
+      <div className="space-y-2 rounded-xl border border-border bg-muted/10 p-3">
+        <Toggle k="usageRightsEnabled" label="حقوق الاستخدام (أجر منفصل · قابل للتجديد)" />
+        {f.usageRightsEnabled ? (
+          !f.contentEnabled ? (
+            <p className="text-[11px] text-destructive">تتطلّب حقوق الاستخدام تفعيل مكوّن المحتوى.</p>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="ميزانية الحقوق">
+                <TextInput type="number" step={step} value={f.usageRightsBudget} onChange={(v) => set("usageRightsBudget", v)} placeholder="200" />
+              </Field>
+              <p className="self-end text-[11px] text-muted-foreground">
+                الأجر يُحدَّد لكل تسليم عند الطلب (≥ الحدّ الأدنى للمنصّة).
+              </p>
+            </div>
+          )
+        ) : null}
+      </div>
+
+      {/* مكوّن البيع */}
+      <div className="space-y-2 rounded-xl border border-border bg-muted/10 p-3">
+        <Toggle k="saleEnabled" label="عمولة بيع (إسناد عبر رابط/كود)" />
+        {f.saleEnabled ? (
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Field label="نسبة المبدع %">
+              <TextInput type="number" value={f.creatorPercent} onChange={(v) => set("creatorPercent", v)} placeholder="20" />
+            </Field>
+            <Field label="ميزانية البيع">
+              <TextInput type="number" step={step} value={f.saleBudget} onChange={(v) => set("saleBudget", v)} placeholder="500" />
+            </Field>
+            <Field label="وجهة الرابط (اختياريّ)">
+              <TextInput type="url" value={f.targetUrl} onChange={(v) => set("targetUrl", v)} placeholder="https://…" />
+            </Field>
+          </div>
+        ) : null}
+      </div>
+
+      {/* مكوّن الأداء */}
+      <div className="space-y-2 rounded-xl border border-border bg-muted/10 p-3">
+        <Toggle k="performanceEnabled" label="أداء (CPC لكل نقرة)" />
+        {f.performanceEnabled ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="سعر النقرة (CPC)">
+              <TextInput type="number" step={step} value={f.cpc} onChange={(v) => set("cpc", v)} placeholder="0.10" />
+            </Field>
+            <Field label="ميزانية الأداء">
+              <TextInput type="number" step={step} value={f.performanceBudget} onChange={(v) => set("performanceBudget", v)} placeholder="300" />
+            </Field>
+          </div>
+        ) : null}
+      </div>
 
       <Field label="البريف / ما تريده من المبدع">
         <TextArea value={f.brief} onChange={(v) => set("brief", v)} placeholder="صف الحملة والمطلوب…" />
@@ -173,36 +220,10 @@ export function NewCampaignForm() {
         <TextArea value={f.requirements} onChange={(v) => set("requirements", v)} placeholder={"ذكر المنتج\nهاشتاق #العلامة"} />
       </Field>
 
-      {/* حقوق الاستخدام — لحملات UGC فقط (شفافية مسبقة للمبدع) */}
-      {f.type === "UGC" ? (
-        <div className="space-y-3 rounded-xl border border-border bg-muted/20 p-3">
-          <label className="flex items-center gap-2 text-sm font-medium text-foreground">
-            <input
-              type="checkbox"
-              checked={f.usageRightsWanted}
-              onChange={(e) => set("usageRightsWanted", e.target.checked)}
-              className="size-4 accent-[var(--primary,#278A8F)]"
-            />
-            سأطلب حقوق استخدام (بأجر منفصل فوق الحدّ الأدنى للمنصّة)
-          </label>
-          {f.usageRightsWanted ? (
-            <>
-              <Field label="ميزانية حقوق الاستخدام (اختياريّ)">
-                <TextInput
-                  type="number"
-                  step={minorStep(f.currency)}
-                  value={f.usageRightsBudget}
-                  onChange={(v) => set("usageRightsBudget", v)}
-                  placeholder="200"
-                />
-              </Field>
-              <p className="text-[11px] text-muted-foreground">
-                يرى المبدع مسبقاً أنّ الحقوق قد تُطلب وأجرها يُتّفق عند الطلب. الأجر منفصل عن أجر المحتوى.
-              </p>
-            </>
-          ) : null}
-        </div>
-      ) : null}
+      <label className="flex items-center gap-2 text-sm text-foreground">
+        <input type="checkbox" checked={f.active} onChange={(e) => set("active", e.target.checked)} className="size-4 accent-[var(--primary,#278A8F)]" />
+        {f.active ? "نشر مباشرة (نشطة)" : "حفظ كمسودّة"}
+      </label>
 
       {error ? (
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</div>

@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { asRecord } from "@/lib/public/block-config";
-import { campaignRemaining, type PayoutConfig } from "@/lib/campaign/config";
+import { campaignRemaining } from "@/lib/campaign/config";
 import {
   resolveRule,
   computeCommission,
@@ -10,21 +10,22 @@ import {
 import { SUPPORTED_CURRENCIES } from "@/lib/payments/money";
 import type { SaleType } from "@/generated/prisma/enums";
 
-// ── محرّك UGC: مستحقّ المحتوى + حقوق الاستخدام + عمولة المنصّة ──────────
-// مصدر الحقيقة للمستحقّ = CampaignPayout · لعمولة المنصّة = CommissionLedger.
-// كلّها minor int · idempotent · لا تتجاوز الميزانية (قصّ كنمط SALE).
+// ── محرّك UGC: مستحقّ المحتوى + حقوق الاستخدام (+ تجديد) + عمولة المنصّة ──
+// كل مستحقّ من ميزانية مكوّنه (لا تسرّب) · minor · idempotent · قصّ للميزانية.
 
 function isUnique(e: unknown): boolean {
   return Boolean(e && typeof e === "object" && (e as { code?: string }).code === "P2002");
 }
 
+export const REVIEW_DEADLINE_DAYS = Number(process.env.UGC_REVIEW_DAYS) || 5;
+export const EXPIRING_SOON_DAYS = Number(process.env.UGC_EXPIRING_SOON_DAYS) || 7;
+
 // ── الحدّ الأدنى لأجر الحقوق (إعداد منصّة per-currency) — يضمن العمولة ──
 const MIN_FEE_KEY = "usage_rights_min_fee";
 
-// افتراضيّ: 5 وحدات أساس من العملة (بمعاملها) — يضمن عمولة > 0.
 export function defaultMinUsageFee(currency: string): number {
   const factor = SUPPORTED_CURRENCIES[currency]?.minorFactor ?? 100;
-  return 5 * factor;
+  return 5 * factor; // 5 وحدات أساس → يضمن عمولة > 0
 }
 
 export async function getMinUsageFees(): Promise<Record<string, number>> {
@@ -38,7 +39,6 @@ export async function getMinUsageFees(): Promise<Record<string, number>> {
   return out;
 }
 
-// الحدّ الأدنى الفعليّ لعملة (المُخزَّن أو الافتراضيّ).
 export async function minUsageFee(currency: string): Promise<number> {
   const fees = await getMinUsageFees();
   const v = fees[currency];
@@ -53,7 +53,7 @@ export async function setMinUsageFees(map: Record<string, number>): Promise<void
   });
 }
 
-// ── عمولة المنصّة على أجر حملة (UGC/الحقوق) — عبر المحرّك الهرميّ ───────
+// ── عمولة المنصّة على أجر حملة (المحتوى/الحقوق) — عبر المحرّك الهرميّ ────
 async function campaignCommission(
   gross: number,
   saleType: SaleType,
@@ -70,9 +70,8 @@ async function campaignCommission(
   return computeCommission(gross, rule);
 }
 
-// ── قبول تسليم UGC → مستحقّ محتوى + عمولة + خصم ميزانية (idempotent) ───
-// يُستدعى عند قبول العلامة. gross = fixedPerContent مقصوصاً لمتبقّي الميزانية.
-export async function accrueUgcContentPayout(submissionId: string): Promise<void> {
+// ── قبول محتوى (يدويّ أو تلقائيّ) → مستحقّ محتوى + عمولة + خصم ميزانية المحتوى ──
+export async function accrueContentPayout(submissionId: string): Promise<void> {
   const sub = await prisma.contentSubmission.findUnique({
     where: { id: submissionId },
     select: {
@@ -83,34 +82,35 @@ export async function accrueUgcContentPayout(submissionId: string): Promise<void
       campaign: {
         select: {
           id: true,
-          type: true,
           currency: true,
           brandId: true,
-          budgetAmount: true,
-          spentAmount: true,
-          payoutConfig: true,
+          contentEnabled: true,
+          contentBudget: true,
+          contentSpent: true,
+          contentPerItem: true,
         },
       },
     },
   });
   if (!sub) return;
+  if (sub.status !== "APPROVED" && sub.status !== "AUTO_APPROVED") return;
   const c = sub.campaign;
-  if (c.type !== "UGC" || !c.currency) return;
+  if (!c.contentEnabled || !c.currency) return;
 
-  // idempotency: مستحقّ UGC واحد لكل تسليم.
+  // idempotency: مستحقّ محتوى واحد لكل تسليم.
   const existing = await prisma.campaignPayout.findFirst({
-    where: { submissionId, type: "UGC" },
+    where: { submissionId, type: "CONTENT" },
     select: { id: true },
   });
   if (existing) return;
 
-  const fpc = (asRecord(c.payoutConfig) as PayoutConfig).fixedPerContent ?? 0;
-  if (fpc <= 0) return;
-  const remaining = campaignRemaining(c.budgetAmount, c.spentAmount);
-  const gross = Math.min(fpc, remaining);
-  if (gross <= 0) return; // ميزانية مستنفدة → لا مستحقّ (قصّ كنمط SALE)
+  const per = c.contentPerItem ?? 0;
+  if (per <= 0) return;
+  const remaining = campaignRemaining(c.contentBudget, c.contentSpent);
+  const gross = Math.min(per, remaining);
+  if (gross <= 0) return; // ميزانية المحتوى مستنفدة → لا مستحقّ (قصّ كنمط SALE)
 
-  const comm = await campaignCommission(gross, "CAMPAIGN", {
+  const comm = await campaignCommission(gross, "CONTENT", {
     creatorProfileId: sub.creatorProfileId,
     brandId: c.brandId,
     campaignId: c.id,
@@ -124,7 +124,7 @@ export async function accrueUgcContentPayout(submissionId: string): Promise<void
           campaignId: c.id,
           participationId: sub.participationId,
           creatorProfileId: sub.creatorProfileId,
-          type: "UGC",
+          type: "CONTENT",
           amount: net,
           grossAmount: gross,
           commissionAmount: comm.commissionAmount,
@@ -140,7 +140,7 @@ export async function accrueUgcContentPayout(submissionId: string): Promise<void
       });
       await tx.campaign.update({
         where: { id: c.id },
-        data: { spentAmount: { increment: gross } },
+        data: { contentSpent: { increment: gross }, spentAmount: { increment: gross } },
       });
       await tx.commissionLedger.create({
         data: {
@@ -148,7 +148,7 @@ export async function accrueUgcContentPayout(submissionId: string): Promise<void
           creatorProfileId: sub.creatorProfileId,
           brandId: c.brandId,
           campaignId: c.id,
-          saleType: "CAMPAIGN",
+          saleType: "CONTENT",
           grossAmount: gross,
           commissionAmount: comm.commissionAmount,
           netCreatorAmount: net,
@@ -159,7 +159,7 @@ export async function accrueUgcContentPayout(submissionId: string): Promise<void
       });
     });
   } catch (e) {
-    if (!isUnique(e)) throw e; // سباق → مستحقّ واحد
+    if (!isUnique(e)) throw e;
   }
 }
 
@@ -218,12 +218,12 @@ export async function acceptUsageRight(
 
   try {
     await prisma.$transaction(async (tx) => {
-      // حارس السباق: يُقبَل فقط إن كان لا يزال REQUESTED.
+      // حارس السباق: يُقبَل فقط إن كان لا يزال REQUESTED → ACTIVE (سارٍ).
       const upd = await tx.usageRight.updateMany({
         where: { id: ur.id, status: "REQUESTED" },
-        data: { status: "ACCEPTED", respondedAt: now, startAt: now, endAt },
+        data: { status: "ACTIVE", respondedAt: now, startAt: now, endAt },
       });
-      if (upd.count === 0) return; // سبق الردّ (سباق)
+      if (upd.count === 0) return;
       if (gross <= 0 || !comm) return; // ميزانية الحقوق مستنفدة → قبول بلا مستحقّ
 
       const payout = await tx.campaignPayout.create({
@@ -237,6 +237,7 @@ export async function acceptUsageRight(
           commissionAmount: comm.commissionAmount,
           currency,
           submissionId: ur.submission.id,
+          usageRightId: ur.id, // idempotency لكل حقّ (يسمح بتجديدات متعدّدة)
           status: "ACCRUED",
         },
         select: { id: true },
@@ -247,7 +248,7 @@ export async function acceptUsageRight(
       });
       await tx.campaign.update({
         where: { id: c.id },
-        data: { usageRightsSpent: { increment: gross } },
+        data: { usageRightsSpent: { increment: gross }, spentAmount: { increment: gross } },
       });
       await tx.commissionLedger.create({
         data: {
@@ -266,7 +267,7 @@ export async function acceptUsageRight(
       });
     });
   } catch (e) {
-    if (!isUnique(e)) throw e; // سباق → مستحقّ واحد
+    if (!isUnique(e)) throw e;
   }
   return { ok: true };
 }
@@ -291,24 +292,57 @@ export async function declineUsageRight(
   return { ok: true };
 }
 
-// كنس كسول: تحويل الحقوق المنتهية مدّتها إلى EXPIRED (فلترة بالوقت — لا cron).
-// يُستدعى في بداية استعلامات المحتوى (مبدع/علامة/أدمن).
-export async function expireUsageRights(): Promise<void> {
+// ── كنس كسول: قبول تلقائيّ للمتأخّر + تحديث حالات الحقوق (لا cron الآن) ──
+export async function autoApproveOverdue(): Promise<void> {
+  const overdue = await prisma.contentSubmission.findMany({
+    where: { status: "SUBMITTED", reviewDeadlineAt: { lt: new Date() } },
+    select: { id: true },
+  });
+  for (const s of overdue) {
+    const upd = await prisma.contentSubmission.updateMany({
+      where: { id: s.id, status: "SUBMITTED" },
+      data: { status: "AUTO_APPROVED", reviewedAt: new Date() },
+    });
+    if (upd.count > 0) await accrueContentPayout(s.id);
+  }
+}
+
+export async function sweepUsageRights(): Promise<void> {
+  const now = new Date();
+  const soon = new Date(now.getTime() + EXPIRING_SOON_DAYS * 86400000);
+  // قربت النهاية → EXPIRING_SOON (نافذة تنبيه التجديد).
   await prisma.usageRight
     .updateMany({
-      where: { status: "ACCEPTED", endAt: { lt: new Date() } },
+      where: { status: { in: ["ACTIVE", "ACCEPTED"] }, endAt: { gte: now, lte: soon } },
+      data: { status: "EXPIRING_SOON" },
+    })
+    .catch(() => {});
+  // انتهت المدّة → EXPIRED.
+  await prisma.usageRight
+    .updateMany({
+      where: { status: { in: ["ACTIVE", "ACCEPTED", "EXPIRING_SOON"] }, endAt: { lt: now } },
       data: { status: "EXPIRED" },
     })
     .catch(() => {});
 }
 
-// هل للتسليم حقّ استخدام سارٍ (مقبول وغير منتهٍ)؟ — شرط التنزيل الإعلانيّ للعلامة.
-export function hasLiveUsageRight(ur: {
-  status: string;
-  endAt: Date | null;
-} | null): boolean {
+// يُستدعى في بداية استعلامات المحتوى (مبدع/علامة/أدمن) — قبول تلقائيّ + كنس الحقوق.
+export async function runUgcSweeps(): Promise<void> {
+  await autoApproveOverdue();
+  await sweepUsageRights();
+}
+
+// حالات الحقّ «الحيّ» (يُتيح التنزيل الإعلانيّ). ACCEPTED legacy مدعوم.
+const LIVE_STATUSES = new Set(["ACTIVE", "ACCEPTED", "EXPIRING_SOON"]);
+
+export function hasLiveUsageRight(ur: { status: string; endAt: Date | null } | null): boolean {
   if (!ur) return false;
-  if (ur.status !== "ACCEPTED") return false;
+  if (!LIVE_STATUSES.has(ur.status)) return false;
   if (ur.endAt && ur.endAt.getTime() < Date.now()) return false;
   return true;
+}
+
+// هل لأيّ حقّ في القائمة حالة حيّة؟ (تنزيل العلامة يتطلّب حقّاً حيّاً واحداً على الأقلّ.)
+export function anyLiveUsageRight(rights: { status: string; endAt: Date | null }[]): boolean {
+  return rights.some((r) => hasLiveUsageRight(r));
 }
