@@ -36,7 +36,7 @@ export default async function BrandPage() {
   // تسليمات UGC لحملات هذه العلامة + الحدّ الأدنى لكل عملة حاضرة.
   const ugcByCampaign = await getBrandUgcSubmissions(data.brand.id);
   const ugcCurrencies = [
-    ...new Set(data.campaigns.filter((c) => c.type === "UGC").map((c) => c.currency)),
+    ...new Set(data.campaigns.filter((c) => c.contentEnabled).map((c) => c.currency)),
   ];
   const minFeeByCurrency = Object.fromEntries(
     await Promise.all(ugcCurrencies.map(async (cur) => [cur, await minUsageFee(cur)] as const)),
@@ -79,13 +79,14 @@ export default async function BrandPage() {
           ) : (
             <div className="mt-4 space-y-4">
               {data.campaigns.map((c) => {
-                const pct = c.budgetAmount ? Math.min(100, Math.round((c.spentAmount / c.budgetAmount) * 100)) : 0;
                 return (
                   <div key={c.id} className="rounded-2xl border border-border bg-card p-4">
                     <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-1.5">
                         <h2 className="font-semibold text-foreground">{c.title}</h2>
-                        <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">{c.typeLabel}</span>
+                        {c.components.map((cmp) => (
+                          <span key={cmp.key} className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">{cmp.label}</span>
+                        ))}
                       </div>
                       <div className="flex items-center gap-3">
                         <span className="text-xs text-muted-foreground">
@@ -95,20 +96,28 @@ export default async function BrandPage() {
                       </div>
                     </div>
 
-                    {/* الميزانية والمصروف */}
-                    {c.budgetAmount ? (
-                      <div className="mb-3">
-                        <div className="mb-1 flex justify-between text-xs text-muted-foreground">
-                          <span>المصروف: {formatMoney(c.spentAmount, c.currency)} من {formatMoney(c.budgetAmount, c.currency)}</span>
-                          <span>{pct}%{pct >= 100 ? " · مستنفدة" : ""}</span>
-                        </div>
-                        <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                          <div className={`h-full rounded-full ${pct >= 100 ? "bg-destructive" : "bg-primary"}`} style={{ width: `${Math.max(2, pct)}%` }} />
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="mb-3 text-xs text-muted-foreground">المصروف: {formatMoney(c.spentAmount, c.currency)} · بلا سقف ميزانيّة</p>
-                    )}
+                    {/* ميزانية كل مكوّن على حدة (لا تسرّب) */}
+                    <div className="mb-3 space-y-2">
+                      {c.components.map((cmp) => {
+                        const pct = cmp.budget ? Math.min(100, Math.round((cmp.spent / cmp.budget) * 100)) : 0;
+                        return (
+                          <div key={cmp.key}>
+                            <div className="mb-1 flex justify-between text-[11px] text-muted-foreground">
+                              <span>
+                                {cmp.label}: {formatMoney(cmp.spent, c.currency)}
+                                {cmp.budget ? ` من ${formatMoney(cmp.budget, c.currency)}` : " · بلا سقف"}
+                              </span>
+                              {cmp.budget ? <span>{pct}%{pct >= 100 ? " · مستنفدة" : ""}</span> : null}
+                            </div>
+                            {cmp.budget ? (
+                              <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                                <div className={`h-full rounded-full ${pct >= 100 ? "bg-destructive" : "bg-primary"}`} style={{ width: `${Math.max(2, pct)}%` }} />
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
 
                     {c.participations.length > 0 ? (
                       <div className="overflow-x-auto rounded-xl border border-border">
@@ -153,8 +162,8 @@ export default async function BrandPage() {
 
                     <AddCreatorForm campaignId={c.id} />
 
-                    {/* حملات UGC: تسليمات المحتوى (معاينة محميّة + مراجعة + حقوق) */}
-                    {c.type === "UGC" ? (
+                    {/* مكوّن المحتوى: تسليمات (معاينة محميّة + مراجعة + حقوق + تجديد) */}
+                    {c.contentEnabled ? (
                       <div className="mt-4 border-t border-border pt-3">
                         <p className="mb-1 text-xs font-semibold text-foreground">
                           تسليمات المحتوى · مراجعة وحقوق الاستخدام

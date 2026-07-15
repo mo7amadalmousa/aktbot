@@ -53,7 +53,7 @@ export default async function CreatorCampaignsPage() {
               const invited = p.status === "INVITED";
               const meta = ugc.metaByCampaign[p.campaignId];
               const subs = ugc.submissionsByParticipation[p.id] ?? [];
-              const isUgc = meta?.type === "UGC";
+              const isUgc = Boolean(meta?.contentEnabled);
               return (
                 <div key={p.id} className="rounded-2xl border border-border bg-card p-4">
                   <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -86,8 +86,8 @@ export default async function CreatorCampaignsPage() {
                                 <strong className="text-foreground">{formatMoney(meta.contentFee, meta.currency)}</strong>.{" "}
                               </>
                             ) : null}
-                            {meta.usageRightsWanted
-                              ? "قد تُطلب حقوق استخدام بأجر منفصل يُتّفق عند الطلب."
+                            {meta.usageRightsEnabled
+                              ? "قد تُطلب حقوق استخدام بأجر منفصل يُتّفق عند الطلب (قابل للتجديد)."
                               : "لا حقوق استخدام مطلوبة."}
                           </p>
                           {meta.brief ? <p className="mt-1">البريف: {meta.brief}</p> : null}

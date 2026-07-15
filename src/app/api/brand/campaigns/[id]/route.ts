@@ -3,11 +3,12 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth/session";
 import {
   sanitizeCampaignInput,
+  campaignComponentData,
   canTransition,
   CampaignError,
 } from "@/lib/campaign/config";
 import { asRecord, str } from "@/lib/public/block-config";
-import type { CampaignStatus } from "@/generated/prisma/enums";
+import type { CampaignStatus, CampaignType } from "@/generated/prisma/enums";
 
 export const runtime = "nodejs";
 
@@ -64,10 +65,10 @@ export async function PUT(
     return NextResponse.json({ ok: true });
   }
 
-  // ── وضع التعديل الكامل (النوع ثابت بعد الإنشاء) ──
+  // ── وضع التعديل الكامل (المكوّنات قابلة للتغيير — التركيب) ──
   let clean;
   try {
-    clean = sanitizeCampaignInput({ ...b, type: campaign.type });
+    clean = sanitizeCampaignInput(b);
   } catch (e) {
     if (e instanceof CampaignError) {
       return NextResponse.json({ ok: false, error: e.message }, { status: 422 });
@@ -78,18 +79,16 @@ export async function PUT(
     where: { id },
     data: {
       title: clean.title,
+      type: clean.type as CampaignType,
       description: clean.description,
       brief: clean.brief,
       coverImage: clean.coverImage,
       currency: clean.currency,
-      budgetAmount: clean.budgetAmount,
       startAt: clean.startAt,
       endAt: clean.endAt,
       targetUrl: clean.targetUrl,
       requirements: clean.requirements as object,
-      payoutConfig: clean.payoutConfig as object,
-      usageRightsWanted: clean.usageRightsWanted,
-      usageRightsBudget: clean.usageRightsBudget,
+      ...campaignComponentData(clean),
     },
   });
   return NextResponse.json({ ok: true });

@@ -1,4 +1,4 @@
-import { mkdir, writeFile, unlink, readFile } from "node:fs/promises";
+import { mkdir, writeFile, unlink, readFile, rename, stat } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
@@ -56,4 +56,28 @@ export async function deletePrivateFile(key: string): Promise<void> {
   try {
     await unlink(keyPath(key));
   } catch {}
+}
+
+// ── دعم الرفع المتدفّق + البثّ بالنطاقات (للفيديو) ────────────────────
+// مسار مطلق مُتحقَّق (لا اجتياز) — للاستخدام مع تيّارات fs مباشرة.
+export function privatePath(key: string): string {
+  return keyPath(key);
+}
+
+export async function ensurePrivateDir(): Promise<void> {
+  const dir = privateDir();
+  if (!existsSync(dir)) await mkdir(dir, { recursive: true });
+}
+
+export async function renamePrivate(from: string, to: string): Promise<void> {
+  await rename(keyPath(from), keyPath(to));
+}
+
+// حجم الملف الخاصّ (bytes) أو null إن غير موجود — لطلبات النطاق (Range).
+export async function privateFileSize(key: string): Promise<number | null> {
+  try {
+    return (await stat(keyPath(key))).size;
+  } catch {
+    return null;
+  }
 }

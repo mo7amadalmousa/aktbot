@@ -678,7 +678,7 @@ async function main() {
     select: { id: true },
   });
   await prisma.campaign.deleteMany({ where: { brandId: brandProfile.id } }); // cascade
-  // حملة SALE كاملة (ميزانية + نسبة المبدع 20% + شروط) — لينا نشطة.
+  // حملة مكوّن البيع (20% للمبدع) — لينا نشطة. (قابلة للتركيب: البيع فقط هنا.)
   const campaign = await prisma.campaign.create({
     data: {
       brandId: brandProfile.id,
@@ -689,11 +689,13 @@ async function main() {
       brief: "أنشئي محتوى يعرض المنتج مع كودك الخاصّ.",
       coverImage: "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=600&q=80",
       currency: "USD",
-      budgetAmount: 50000, // ‏$500
       targetUrl: "https://glow.example.com/summer",
       requirements: { items: ["ذكر العلامة", "استخدام الكود في الوصف"] },
-      payoutConfig: { creatorBps: 2000 }, // 20% للمبدع
-      spentAmount: 800, // مصروف تجريبيّ (يطابق مستحقّ لينا)
+      saleEnabled: true,
+      saleBudget: 50000, // ‏$500
+      saleCreatorBps: 2000, // 20% للمبدع
+      saleSpent: 800,
+      spentAmount: 800, // إجماليّ تجريبيّ (يطابق مستحقّ لينا)
     },
     select: { id: true },
   });
@@ -723,21 +725,29 @@ async function main() {
     },
   });
 
-  // حملة UGC كاملة (C6): تسليم → مراجعة → مستحقّ + حقوق استخدام بأجر منفصل.
+  // حملة مركّبة (C6): محتوى + حقوق استخدام + بيع — كلٌّ بميزانيّته (لا تسرّب).
   const ugcCampaign = await prisma.campaign.create({
     data: {
       brandId: brandProfile.id,
-      title: "تحدّي المحتوى الخريفيّ (UGC)",
+      title: "تحدّي المحتوى الخريفيّ (مركّبة)",
       type: "UGC",
       status: "ACTIVE",
-      description: "أنشئي فيديو/صورة UGC واكسبي مبلغاً لكل محتوى مقبول.",
+      description: "أنشئي محتوى، واكسبي أجره + حقوق استخدام + عمولة بيع عبر رابطك.",
       brief: "أنشئي محتوى يعرض روتين الخريف مع منتجاتنا.",
       currency: "USD",
-      budgetAmount: 100000, // ‏$1000 (ميزانية المحتوى)
-      payoutConfig: { fixedPerContent: 5000 }, // ‏$50 لكل محتوى مقبول
       requirements: { items: ["إضاءة جيّدة", "ذكر العلامة"] },
+      // مكوّن المحتوى
+      contentEnabled: true,
+      contentBudget: 100000, // ‏$1000
+      contentPerItem: 5000, // ‏$50 لكل محتوى مقبول
+      contentCount: 3,
+      // مكوّن حقوق الاستخدام
       usageRightsWanted: true,
-      usageRightsBudget: 20000, // ‏$200 (ميزانية الحقوق المنفصلة)
+      usageRightsBudget: 20000, // ‏$200
+      // مكوّن البيع (متوازٍ)
+      saleEnabled: true,
+      saleBudget: 30000, // ‏$300
+      saleCreatorBps: 1500, // 15%
     },
     select: { id: true },
   });
@@ -771,6 +781,7 @@ async function main() {
       assetKey: UGC_KEY,
       caption: "منشور تجريبيّ لتحدّي الخريف",
       status: "SUBMITTED",
+      reviewDeadlineAt: new Date(Date.now() + 5 * 86400000), // مهلة مراجعة 5 أيّام
     },
   });
 

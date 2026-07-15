@@ -30,6 +30,12 @@ export interface ParticipationView {
   salesValue: number;
   payoutAccrued: number;
 }
+export interface CampaignComponent {
+  key: "content" | "usageRights" | "sale" | "performance";
+  label: string;
+  budget: number | null;
+  spent: number;
+}
 export interface CampaignView {
   id: string;
   title: string;
@@ -40,6 +46,8 @@ export interface CampaignView {
   currency: string;
   budgetAmount: number | null;
   spentAmount: number;
+  contentEnabled: boolean;
+  components: CampaignComponent[];
   participations: ParticipationView[];
   totals: PerfTotals;
 }
@@ -108,6 +116,11 @@ export async function getBrandOverview(userId: string): Promise<BrandOverview> {
       };
     });
     add(totals, cTotals);
+    const components: CampaignComponent[] = [];
+    if (c.contentEnabled) components.push({ key: "content", label: "المحتوى", budget: c.contentBudget, spent: c.contentSpent });
+    if (c.usageRightsWanted) components.push({ key: "usageRights", label: "الحقوق", budget: c.usageRightsBudget, spent: c.usageRightsSpent });
+    if (c.saleEnabled) components.push({ key: "sale", label: "البيع", budget: c.saleBudget, spent: c.saleSpent });
+    if (c.performanceEnabled) components.push({ key: "performance", label: "الأداء", budget: c.performanceBudget, spent: c.performanceSpent });
     return {
       id: c.id,
       title: c.title,
@@ -118,6 +131,8 @@ export async function getBrandOverview(userId: string): Promise<BrandOverview> {
       currency: c.currency ?? "USD",
       budgetAmount: c.budgetAmount,
       spentAmount: c.spentAmount,
+      contentEnabled: c.contentEnabled,
+      components,
       participations,
       totals: cTotals,
     };
@@ -207,6 +222,9 @@ export async function getPlatformCampaigns(): Promise<AdminCampaignRow[]> {
       },
       { clicks: 0, sales: 0, salesValue: 0 },
     );
+    // إجمالي ميزانية المكوّنات (أو budgetAmount legacy إن لم تُضبط مكوّنات).
+    const compBudget =
+      (c.contentBudget ?? 0) + (c.usageRightsBudget ?? 0) + (c.saleBudget ?? 0) + (c.performanceBudget ?? 0);
     return {
       id: c.id,
       title: c.title,
@@ -214,7 +232,7 @@ export async function getPlatformCampaigns(): Promise<AdminCampaignRow[]> {
       type: c.type,
       status: c.status,
       currency: c.currency ?? "USD",
-      budgetAmount: c.budgetAmount,
+      budgetAmount: compBudget > 0 ? compBudget : c.budgetAmount,
       spentAmount: c.spentAmount,
       participants: c._count.participations,
       clicks: agg.clicks,
