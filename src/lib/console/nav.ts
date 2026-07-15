@@ -4,6 +4,7 @@ import {
   Users,
   Building2,
   Megaphone,
+  Clapperboard,
   Wallet,
   BarChart3,
   Settings,
@@ -43,6 +44,7 @@ export const CONSOLE_NAV: NavGroup[] = [
     key: "groupGrowth",
     items: [
       { key: "campaigns", href: "/admin/campaigns", icon: Megaphone, enabled: true },
+      { key: "content", href: "/admin/content", icon: Clapperboard, enabled: true },
     ],
   },
   {

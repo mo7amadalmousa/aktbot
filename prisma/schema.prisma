@@ -125,6 +125,7 @@ model CreatorProfile {
   commissions  CommissionLedger[]
   participations CampaignParticipation[]
   campaignPayouts CampaignPayout[]
+  contentSubmissions ContentSubmission[]
 }
 
 // مشتركو النشرة البريديّة لكل مبدع (جمع فقط الآن؛ إرسال الحملات لاحقاً).
@@ -532,12 +533,14 @@ model CommissionRule {
 // سجلّ العمولة — مصدر الحقيقة. صفّ لكل طلب مؤكّد (قيد فريد يمنع الازدواج).
 model CommissionLedger {
   id               String       @id @default(cuid())
-  orderId          String       @unique
+  // orderId اختياريّ الآن (additive): عمولة الحملة (UGC/الحقوق) لا طلب شراء لها.
+  orderId          String?      @unique
+  campaignPayoutId String?      @unique // مصدر عمولة الحملة (UGC/الحقوق) — idempotency
   creatorProfileId String
   brandId          String? // طبقة لاحقة
   campaignId       String? // طبقة لاحقة
   saleType         SaleType
-  grossAmount      Int // إجماليّ البيع (minor)
+  grossAmount      Int // إجماليّ البيع/الأجر (minor)
   commissionAmount Int // عمولة المنصّة (minor)
   netCreatorAmount Int // صافي المبدع (minor)
   appliedRuleId    String? // القاعدة المطبّقة (null = fallback صفر)
@@ -547,7 +550,7 @@ model CommissionLedger {
   updatedAt        DateTime     @updatedAt
 
   creatorProfile CreatorProfile @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
-  order          Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order          Order?         @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([creatorProfileId])
   @@index([status])
@@ -604,13 +607,18 @@ model Campaign {
   // إعدادات الدفع حسب النوع (json مرن): SALE {creatorBps|fixedPerSale} ·
   // PERFORMANCE {cpcMinor} · UGC {fixedPerContent}. minor بعملة الحملة.
   payoutConfig Json?
-  spentAmount Int            @default(0) // مجموع المستحقات (لحماية الميزانية O(1))
+  spentAmount Int            @default(0) // مجموع مستحقات المحتوى/المبيعات (حماية الميزانية O(1))
+  // حقوق الاستخدام (UGC C6) — additive · ميزانية منفصلة عن ميزانية المحتوى.
+  usageRightsWanted Boolean  @default(false) // شفافية مسبقة: هل تُطلب حقوق استخدام؟
+  usageRightsBudget Int? // minor — سقف مستقلّ لأجور الحقوق
+  usageRightsSpent  Int      @default(0) // مجموع أجور الحقوق المقبولة (حماية O(1))
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
   brand          BrandProfile            @relation(fields: [brandId], references: [id], onDelete: Cascade)
   participations CampaignParticipation[]
   payouts        CampaignPayout[]
+  submissions    ContentSubmission[]
 
   @@index([brandId])
   @@index([status])
@@ -645,6 +653,7 @@ model CampaignParticipation {
   attributionEvents AttributionEvent[]
   orders            Order[]
   payouts           CampaignPayout[]
+  submissions       ContentSubmission[]
 
   @@unique([campaignId, creatorProfileId])
   @@index([campaignId])
@@ -678,7 +687,8 @@ model AttributionEvent {
 enum PayoutType {
   SALE // نسبة/مبلغ من بيعة مُسنَدة
   PERFORMANCE // لكل نقرة (CPC)
-  UGC // لكل محتوى مقبول (القبول في ن22)
+  UGC // لكل محتوى مقبول (يُحتسب عند قبول العلامة)
+  USAGE_RIGHTS // أجر حقّ استخدام محتوى مقبول (منفصل عن أجر المحتوى)
 }
 
 enum PayoutStatus {
@@ -694,9 +704,13 @@ model CampaignPayout {
   participationId  String
   creatorProfileId String
   type             PayoutType
-  amount           Int // minor — بعملة الحملة
+  amount           Int // minor — صافي مستحقّ المبدع بعملة الحملة (بعد عمولة المنصّة لـUGC/الحقوق)
   currency         String
   orderId          String?      @unique // SALE: idempotency (null للأنواع الأخرى)
+  // UGC/USAGE_RIGHTS (additive): مصدر التسليم + الأجر الإجماليّ وعمولة المنصّة منه.
+  submissionId     String? // التسليم المرتبط (UGC/الحقوق) — null لـSALE/PERFORMANCE
+  grossAmount      Int? // أجر العلامة الإجماليّ قبل عمولة المنصّة (F) — null للقديم
+  commissionAmount Int          @default(0) // عمولة المنصّة (C) — 0 لـSALE/PERFORMANCE
   status           PayoutStatus @default(ACCRUED)
   note             String?
   createdAt        DateTime     @default(now())
@@ -704,9 +718,97 @@ model CampaignPayout {
   campaign       Campaign              @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   participation  CampaignParticipation @relation(fields: [participationId], references: [id], onDelete: Cascade)
   creatorProfile CreatorProfile        @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
+  submission     ContentSubmission?    @relation(fields: [submissionId], references: [id], onDelete: Cascade)
 
+  @@unique([submissionId, type]) // مستحقّ واحد لكل (تسليم، نوع) — منع دفع مزدوج
   @@index([campaignId])
   @@index([participationId])
   @@index([creatorProfileId])
+  @@index([submissionId])
   @@index([status])
+}
+
+// ── UGC: تسليم المحتوى + مراجعة + حقوق الاستخدام (C6) ──────────────────
+enum SubmissionType {
+  VIDEO
+  IMAGE
+}
+
+enum SubmissionStatus {
+  SUBMITTED // بانتظار مراجعة العلامة
+  APPROVED // مقبول → مستحقّ محتوى للمبدع
+  REJECTED // مرفوض → لا مستحقّ
+  REVISION_REQUESTED // طلب تعديل → يعيد المبدع التسليم
+}
+
+// تسليم المبدع لمحتوى حملة UGC. الملف في تخزين خاصّ (assetKey) لا يُخدَم عاماً؛
+// يُبَثّ فقط عبر مسار محميّ (العلامة تراجع · التنزيل الإعلانيّ بعد قبول الحقوق).
+model ContentSubmission {
+  id               String           @id @default(cuid())
+  participationId  String
+  campaignId       String
+  creatorProfileId String
+  type             SubmissionType
+  assetKey         String // مفتاح التخزين الخاصّ (private) — لا رابط عام
+  thumbnailKey     String? // مصغّر خاصّ اختياريّ
+  caption          String?
+  status           SubmissionStatus @default(SUBMITTED)
+  reviewNote       String?
+  reviewedAt       DateTime?
+  createdAt        DateTime         @default(now())
+
+  participation  CampaignParticipation @relation(fields: [participationId], references: [id], onDelete: Cascade)
+  campaign       Campaign              @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  creatorProfile CreatorProfile        @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
+  payouts        CampaignPayout[]
+  usageRight     UsageRight?
+
+  @@index([participationId])
+  @@index([campaignId])
+  @@index([creatorProfileId])
+  @@index([status])
+}
+
+enum UsageRightStatus {
+  NOT_REQUESTED // لا صفّ (حالة مفاهيميّة)
+  REQUESTED // طلبت العلامة الحقوق — بانتظار ردّ المبدع
+  ACCEPTED // قبِل المبدع — سارية بمدّة
+  DECLINED // رفض المبدع
+  EXPIRED // انتهت مدّة السريان
+}
+
+enum UsageScope {
+  ORGANIC // عضويّ
+  PAID // إعلان مدفوع
+  WHITELISTING // whitelisting / Spark Ads (تسجيل النطاق · التنفيذ الفعليّ لاحقاً)
+}
+
+// حقّ استخدام لمحتوى مقبول — أجر منفصل فوق الحدّ الأدنى للمنصّة (يضمن العمولة).
+model UsageRight {
+  id           String           @id @default(cuid())
+  submissionId String           @unique
+  status       UsageRightStatus @default(REQUESTED)
+  feeAmount    Int // minor — أجر الحقوق بعملة الحملة (≥ الحدّ الأدنى)
+  currency     String
+  durationDays Int // مدّة السريان بالأيّام
+  channels     Json? // { meta, tiktok, youtube, instagram, ... } قنوات مسموحة
+  scope        UsageScope       @default(ORGANIC)
+  requestedAt  DateTime         @default(now())
+  respondedAt  DateTime? // وقت قبول/رفض المبدع
+  startAt      DateTime? // بداية السريان (عند القبول)
+  endAt        DateTime? // نهاية السريان (عند القبول)
+  createdAt    DateTime         @default(now())
+
+  submission ContentSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+}
+
+// إعدادات المنصّة (key/value مرن) — الحدّ الأدنى لأجر الحقوق لكل عملة يُخزَّن هنا.
+// قرار: جدول إعدادات عامّ (لا توسيع CommissionRule) — أوضح وأعمّ للنموّ.
+model PlatformSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
 }

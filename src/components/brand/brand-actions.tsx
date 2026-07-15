@@ -9,7 +9,7 @@ import { currencyList, minorStep } from "@/lib/payments/money";
 const TYPE_HINT: Record<string, string> = {
   SALE: "المبدع يكسب نسبة/مبلغاً من كل بيعة عبر رابطه.",
   PERFORMANCE: "المبدع يكسب مبلغاً لكل نقرة (CPC).",
-  UGC: "المبدع يكسب مبلغاً لكل محتوى مقبول (القبول لاحقاً).",
+  UGC: "المبدع يسلّم محتوى، وتراجعينه؛ يكسب مبلغاً لكل محتوى مقبول، وقد تُطلب حقوق استخدام بأجر منفصل.",
 };
 
 // نموذج إنشاء حملة كامل — النوع + الميزانية + المدّة + الشروط + إعداد الدفع.
@@ -30,6 +30,9 @@ export function NewCampaignForm() {
     creatorPercent: "20", // SALE (نسبة المبدع %)
     cpc: "0.10", // PERFORMANCE (لكل نقرة)
     fixedPerContent: "10", // UGC
+    // حقوق الاستخدام (UGC)
+    usageRightsWanted: false,
+    usageRightsBudget: "",
     active: true,
   });
   const set = (k: string, v: string | boolean) => setF((s) => ({ ...s, [k]: v }));
@@ -62,6 +65,11 @@ export function NewCampaignForm() {
         requirements: f.requirements
           ? f.requirements.split("\n").map((s) => s.trim()).filter(Boolean)
           : [],
+        usageRightsWanted: f.type === "UGC" ? f.usageRightsWanted : undefined,
+        usageRightsBudget:
+          f.type === "UGC" && f.usageRightsWanted && f.usageRightsBudget
+            ? Number(f.usageRightsBudget)
+            : undefined,
         ...payout,
       }),
     });
@@ -164,6 +172,37 @@ export function NewCampaignForm() {
       <Field label="الشروط (سطر لكل شرط)">
         <TextArea value={f.requirements} onChange={(v) => set("requirements", v)} placeholder={"ذكر المنتج\nهاشتاق #العلامة"} />
       </Field>
+
+      {/* حقوق الاستخدام — لحملات UGC فقط (شفافية مسبقة للمبدع) */}
+      {f.type === "UGC" ? (
+        <div className="space-y-3 rounded-xl border border-border bg-muted/20 p-3">
+          <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+            <input
+              type="checkbox"
+              checked={f.usageRightsWanted}
+              onChange={(e) => set("usageRightsWanted", e.target.checked)}
+              className="size-4 accent-[var(--primary,#278A8F)]"
+            />
+            سأطلب حقوق استخدام (بأجر منفصل فوق الحدّ الأدنى للمنصّة)
+          </label>
+          {f.usageRightsWanted ? (
+            <>
+              <Field label="ميزانية حقوق الاستخدام (اختياريّ)">
+                <TextInput
+                  type="number"
+                  step={minorStep(f.currency)}
+                  value={f.usageRightsBudget}
+                  onChange={(v) => set("usageRightsBudget", v)}
+                  placeholder="200"
+                />
+              </Field>
+              <p className="text-[11px] text-muted-foreground">
+                يرى المبدع مسبقاً أنّ الحقوق قد تُطلب وأجرها يُتّفق عند الطلب. الأجر منفصل عن أجر المحتوى.
+              </p>
+            </>
+          ) : null}
+        </div>
+      ) : null}
 
       {error ? (
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</div>

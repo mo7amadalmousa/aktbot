@@ -78,6 +78,7 @@ export interface AdminMessages {
     creators: string;
     brands: string;
     campaigns: string;
+    content: string;
     commission: string;
     reports: string;
     settings: string;
@@ -143,6 +144,27 @@ export interface AdminMessages {
     colSpent: string;
     colParticipants: string;
     colSales: string;
+  };
+  content: {
+    title: string;
+    desc: string;
+    total: string;
+    approved: string;
+    rightsAccepted: string;
+    minFeeTitle: string;
+    minFeeDesc: string;
+    save: string;
+    saved: string;
+    defaultHint: string;
+    colCampaign: string;
+    colBrand: string;
+    colCreator: string;
+    colType: string;
+    colStatus: string;
+    colUsage: string;
+    colFee: string;
+    colNet: string;
+    colDate: string;
   };
 }
 

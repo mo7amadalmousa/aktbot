@@ -88,6 +88,8 @@ export async function PUT(
       targetUrl: clean.targetUrl,
       requirements: clean.requirements as object,
       payoutConfig: clean.payoutConfig as object,
+      usageRightsWanted: clean.usageRightsWanted,
+      usageRightsBudget: clean.usageRightsBudget,
     },
   });
   return NextResponse.json({ ok: true });
