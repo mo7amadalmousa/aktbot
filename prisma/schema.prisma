@@ -839,3 +839,33 @@ model PlatformSetting {
   updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())
 }
+
+// ── نظام المحتوى (CMS) — تحرير موضعيّ لمحتوى داخل تخطيط ثابت ────────────
+// overlay: القيَم الافتراضيّة من i18n؛ هنا تُخزَّن التجاوزات فقط (fieldKey→value).
+// مسوّدة/منشور: الزائر يرى published؛ الأدمن يحرّر draft ثم ينشر.
+model PageContent {
+  id        String   @id @default(cuid())
+  pageKey   String // "landing" | "about" | "contact" | "legal-privacy" | ...
+  locale    String // "ar" | "en" | "tr"
+  draft     Json? // تجاوزات قيد التحرير { fieldKey: value }
+  published Json? // التجاوزات المنشورة (ما يراه الزائر)
+  updatedBy String? // معرّف الأدمن الذي حدّث
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@unique([pageKey, locale])
+  @@index([pageKey])
+}
+
+// رسائل نموذج «تواصل معنا» (تُخزَّن + تُرسَل بريداً عبر المزوّد المحايد).
+model ContactMessage {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  subject   String?
+  message   String
+  locale    String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
