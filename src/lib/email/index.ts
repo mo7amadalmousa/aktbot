@@ -399,6 +399,39 @@ ${data.trackingNumber ? `<p>رقم التتبّع: <strong>${data.trackingNumber
   });
 }
 
+// ── نموذج «تواصل معنا» (إشعار الفريق) ─────────────────────────────────
+interface ContactData {
+  name: string;
+  email: string;
+  subject: string | null;
+  message: string;
+  locale: string | null;
+}
+
+// يصل بريداً لصندوق الفريق (mock الآن؛ SMTP لاحقاً).
+export async function sendContactNotification(data: ContactData): Promise<void> {
+  await getEmailAdapter().send({
+    to: "hello@aktbot.com",
+    subject: `AktBot — رسالة تواصل: ${data.subject || "(بلا موضوع)"}`,
+    text: [
+      "رسالة جديدة من نموذج التواصل:",
+      "",
+      `الاسم: ${data.name}`,
+      `البريد: ${data.email}`,
+      `الموضوع: ${data.subject || "—"}`,
+      `اللغة: ${data.locale || "—"}`,
+      "",
+      "الرسالة:",
+      data.message,
+      `— ${FROM}`,
+    ].join("\n"),
+    html: `<p>رسالة جديدة من نموذج التواصل:</p>
+<p>الاسم: <strong>${data.name}</strong><br/>البريد: ${data.email}<br/>الموضوع: ${data.subject || "—"}<br/>اللغة: ${data.locale || "—"}</p>
+<p style="white-space:pre-wrap">${data.message}</p>
+<p style="color:#666">— ${FROM}</p>`,
+  });
+}
+
 // ── UGC: مراجعة المحتوى + طلب حقوق الاستخدام ──────────────────────────
 interface SubmissionReviewData {
   creatorName: string;

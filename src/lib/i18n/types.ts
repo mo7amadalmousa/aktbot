@@ -5,8 +5,51 @@ export interface TitledItem {
   desc: string;
 }
 
+export interface AudiencePanel {
+  eyebrow: string;
+  title: string;
+  subtitle: string;
+  tagline: string;
+  cta: string;
+  ctaHref: string;
+  s1Title: string;
+  s1: TitledItem[];
+  s2Title: string;
+  s2: TitledItem[];
+  s3Title: string;
+  s3: TitledItem[];
+  stats: { value: string; label: string }[];
+  finalTitle: string;
+  finalSub: string;
+  finalCta: string;
+}
+
+export interface SplitMessages {
+  toggleLabel: string;
+  brandsTab: string;
+  creatorsTab: string;
+  brands: AudiencePanel;
+  creators: AudiencePanel;
+}
+
+// نطاق الصفحات الأساسيّة/القانونيّة (حولنا · تواصل · القانونيّة).
+export interface PagesMessages {
+  about: { metaTitle: string; metaDesc: string; title: string; intro: string; body: string; missionTitle: string; mission: string };
+  contact: { metaTitle: string; metaDesc: string; title: string; intro: string; name: string; email: string; subject: string; message: string; send: string; success: string; error: string };
+  legalNote: string; // «النصّ بانتظار مراجعة المحامي»
+  legal: {
+    privacy: { title: string; metaDesc: string };
+    terms: { title: string; metaDesc: string };
+    distance: { title: string; metaDesc: string };
+    refund: { title: string; metaDesc: string };
+    cookies: { title: string; metaDesc: string };
+  };
+}
+
 export interface LandingMessages {
   meta: { title: string; description: string; ogAlt: string };
+  split: SplitMessages;
+  pages: PagesMessages;
   nav: {
     forCreators: string;
     forBrands: string;
